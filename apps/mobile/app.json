@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "FitTrack Pro",
+    "slug": "fittrack-pro",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "fittrack",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#080809"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.fittrackpro.app",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "FitTrack reads your Apple Health data to display your activity, steps, and heart rate alongside your workout history.",
+        "NSHealthUpdateUsageDescription": "FitTrack writes completed workouts and body measurements to Apple Health."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#080809"
+      },
+      "package": "com.fittrackpro.app"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "16.0"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
