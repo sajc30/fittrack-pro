@@ -1,0 +1,167 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* ── Fonts ── */
+  --font-display: "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* ── Color palette ── */
+  --color-void:          #080809;
+  --color-surface:       #111114;
+  --color-raised:        #18181C;
+  --color-inset:         #050506;
+  --color-border:        #1E1E24;
+  --color-border-bright: #2A2A34;
+
+  --color-text-primary:   #EBEBED;
+  --color-text-secondary: #6B7280;
+  --color-text-ghost:     #3A3A46;
+
+  --color-amber:     #F59E0B;
+  --color-amber-glow:#FCD34D;
+  --color-amber-dim: #78450A;
+
+  --color-green:  #16A34A;
+  --color-red:    #DC2626;
+  --color-blue:   #2563EB;
+
+  /* ── Radius ── */
+  --radius-sharp:  4px;
+  --radius-base:   8px;
+  --radius-soft:   12px;
+  --radius-pill:   9999px;
+
+  /* ── Motion ── */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Base reset & dark-first foundation ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--color-void);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  /* Subtle noise texture — the detail that separates flat from crafted */
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.02'/%3E%3C/svg%3E");
+}
+
+/* ── shadcn token override — map to our system ── */
+:root {
+  --background: 0 0% 3%;
+  --foreground: 240 7% 93%;
+  --card: 240 5% 7%;
+  --card-foreground: 240 7% 93%;
+  --popover: 240 5% 7%;
+  --popover-foreground: 240 7% 93%;
+  --primary: 38 92% 50%;
+  --primary-foreground: 240 5% 7%;
+  --secondary: 240 4% 11%;
+  --secondary-foreground: 240 7% 93%;
+  --muted: 240 4% 11%;
+  --muted-foreground: 220 9% 46%;
+  --accent: 38 92% 50%;
+  --accent-foreground: 240 5% 7%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 240 7% 93%;
+  --border: 240 5% 14%;
+  --input: 240 5% 14%;
+  --ring: 38 92% 50%;
+  --radius: 0.5rem;
+}
+
+/* ── Typography utilities ── */
+.font-display { font-family: var(--font-display); }
+.font-sans    { font-family: var(--font-sans); }
+
+/* Stat sizes — Barlow Condensed data display */
+.stat-hero  { font-family: var(--font-display); font-size: 72px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+.stat-large { font-family: var(--font-display); font-size: 48px; font-weight: 700; letter-spacing: -0.01em; line-height: 1; }
+.stat-mid   { font-family: var(--font-display); font-size: 32px; font-weight: 600; letter-spacing: 0;       line-height: 1.1; }
+.stat-small { font-family: var(--font-display); font-size: 20px; font-weight: 500; letter-spacing: 0;       line-height: 1.2; }
+
+/* UI label uppercase style */
+.label-caps {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+/* ── Focus ring — amber, precise ── */
+:focus-visible {
+  outline: 1px solid var(--color-amber);
+  outline-offset: 2px;
+}
+
+/* ── Scrollbar — dark and minimal ── */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border-bright); border-radius: var(--radius-pill); }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-ghost); }
+
+/* ── Selection color ── */
+::selection { background: var(--color-amber-dim); color: var(--color-amber-glow); }
+
+/* ── Skeleton shimmer ── */
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface) 25%,
+    var(--color-raised) 50%,
+    var(--color-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease infinite;
+  border-radius: var(--radius-base);
+}
+
+/* ── PR pulse animation ── */
+@keyframes pr-pulse {
+  0%   { opacity: 0.15; transform: scale(0); }
+  50%  { opacity: 0.08; }
+  100% { opacity: 0;    transform: scale(2); }
+}
+
+.pr-pulse {
+  animation: pr-pulse 0.4s var(--ease-out-expo) forwards;
+}
+
+/* ── Page transition fade ── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.page-enter {
+  animation: fade-in 0.2s var(--ease-out-expo) both;
+}
+
+/* ── Rest timer progress ── */
+@keyframes rest-timer-glow {
+  0%, 100% { box-shadow: 0 0 4px 0 rgba(245,158,11,0.3); }
+  50%       { box-shadow: 0 0 8px 2px rgba(245,158,11,0.6); }
+}
+
+.rest-timer-active {
+  animation: rest-timer-glow 2s ease-in-out infinite;
+}
