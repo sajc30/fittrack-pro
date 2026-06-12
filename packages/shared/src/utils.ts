@@ -47,28 +47,45 @@ export function formatWorkoutDate(dateStr: string): string {
   });
 }
 
+/** Day key in the user's local timezone — a 9pm workout must count for the local day, not the UTC one. */
+function localDayKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
+}
+
+function parseDayKey(key: string): Date {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 /**
  * Calculate the current streak from an array of workout dates (ISO strings).
- * Returns number of consecutive days with at least one workout up to today.
+ * Returns number of consecutive local-timezone days with at least one workout,
+ * counting back from today (or yesterday, so a streak survives until midnight).
  */
 export function calculateStreak(workoutDates: string[]): number {
   if (workoutDates.length === 0) return 0;
 
   const uniqueDays = [
-    ...new Set(workoutDates.map((d) => d.split("T")[0])),
-  ].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+    ...new Set(workoutDates.map((d) => localDayKey(new Date(d)))),
+  ]
+    .sort()
+    .reverse();
 
-  const today = new Date().toISOString().split("T")[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+  const today = localDayKey(new Date());
+  const yesterdayDate = new Date();
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterday = localDayKey(yesterdayDate);
 
   if (uniqueDays[0] !== today && uniqueDays[0] !== yesterday) return 0;
 
   let streak = 1;
   for (let i = 1; i < uniqueDays.length; i++) {
-    const prev = new Date(uniqueDays[i - 1]);
-    const curr = new Date(uniqueDays[i]);
-    const diff =
-      (prev.getTime() - curr.getTime()) / (1000 * 60 * 60 * 24);
+    const prev = parseDayKey(uniqueDays[i - 1]);
+    const curr = parseDayKey(uniqueDays[i]);
+    // Round to absorb DST days that aren't exactly 24h long
+    const diff = Math.round((prev.getTime() - curr.getTime()) / 86400000);
     if (diff === 1) {
       streak++;
     } else {

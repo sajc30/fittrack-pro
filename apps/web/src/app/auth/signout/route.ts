@@ -1,14 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
-export async function POST() {
+async function signOutAndRedirect(request: Request) {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  return NextResponse.redirect(new URL("/auth/login", process.env.NEXT_PUBLIC_SUPABASE_URL!.replace("supabase.co", "localhost:3000")));
+  return NextResponse.redirect(new URL("/auth/login", request.url), { status: 303 });
 }
 
-export async function GET() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
-  return NextResponse.redirect("http://localhost:3000/auth/login");
+export async function POST(request: Request) {
+  return signOutAndRedirect(request);
+}
+
+export async function GET(request: Request) {
+  return signOutAndRedirect(request);
 }

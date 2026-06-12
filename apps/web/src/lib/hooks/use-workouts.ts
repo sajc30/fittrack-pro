@@ -33,10 +33,29 @@ export function useWorkouts(limit = 50) {
 }
 
 export function useStreak() {
-  const { data: workouts } = useWorkouts(200);
+  const supabase = createClient();
 
-  const dates = (workouts ?? []).map((w) => w.started_at);
-  return calculateStreak(dates);
+  // Dates only — fetching full workouts with nested sets just for a streak
+  // is the dashboard's heaviest query for no reason.
+  const { data } = useQuery({
+    queryKey: ["workout-dates"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      const { data, error } = await supabase
+        .from("workouts")
+        .select("started_at")
+        .eq("user_id", user.id)
+        .order("started_at", { ascending: false })
+        .limit(365);
+
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  return calculateStreak((data ?? []).map((w) => w.started_at));
 }
 
 export function useWeeklyVolume() {
@@ -100,7 +119,10 @@ export function useCreateWorkout() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workouts"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workouts"] });
+      queryClient.invalidateQueries({ queryKey: ["workout-dates"] });
+    },
   });
 }
 
@@ -130,6 +152,7 @@ export function useFinishWorkout() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workouts"] });
+      queryClient.invalidateQueries({ queryKey: ["workout-dates"] });
       queryClient.invalidateQueries({ queryKey: ["logged-exercises"] });
     },
   });
@@ -232,6 +255,7 @@ export function useDeleteWorkout() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workouts"] });
+      queryClient.invalidateQueries({ queryKey: ["workout-dates"] });
       queryClient.invalidateQueries({ queryKey: ["prs"] });
       queryClient.invalidateQueries({ queryKey: ["logged-exercises"] });
     },

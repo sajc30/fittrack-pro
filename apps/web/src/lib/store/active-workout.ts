@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 export interface ActiveSet {
   tempId: string;
@@ -19,12 +20,12 @@ export interface ActiveExercise {
 interface ActiveWorkoutState {
   workoutId: string | null;
   workoutName: string;
-  startedAt: Date | null;
+  /** ISO timestamp — elapsed time derives from this, so it survives refreshes and tab throttling. */
+  startedAt: string | null;
   exercises: ActiveExercise[];
   currentExerciseIndex: number;
-  restSeconds: number;
-  isResting: boolean;
-  elapsedSeconds: number;
+  /** Epoch ms when the current rest period ends; null when not resting. */
+  restEndsAt: number | null;
 
   // Actions
   startWorkout: (id: string, name: string) => void;
@@ -34,9 +35,8 @@ interface ActiveWorkoutState {
   updateSet: (exerciseIndex: number, setIndex: number, updates: Partial<ActiveSet>) => void;
   markSetLogged: (exerciseIndex: number, setIndex: number, isPR: boolean) => void;
   setCurrentExercise: (index: number) => void;
-  startRestTimer: (seconds: number) => void;
-  tickRest: () => void;
-  tickElapsed: () => void;
+  startRest: (seconds: number) => void;
+  clearRest: () => void;
   resetWorkout: () => void;
 }
 
@@ -49,95 +49,88 @@ const makeSet = (): ActiveSet => ({
   isPR: false,
 });
 
-export const useActiveWorkout = create<ActiveWorkoutState>((set) => ({
-  workoutId: null,
-  workoutName: "",
-  startedAt: null,
-  exercises: [],
-  currentExerciseIndex: 0,
-  restSeconds: 0,
-  isResting: false,
-  elapsedSeconds: 0,
-
-  startWorkout: (id, name) =>
-    set({ workoutId: id, workoutName: name, startedAt: new Date(), elapsedSeconds: 0 }),
-
-  addExercise: (exercise) =>
-    set((state) => ({
-      exercises: [
-        ...state.exercises,
-        { ...exercise, sets: [makeSet()] },
-      ],
-      currentExerciseIndex: state.exercises.length,
-    })),
-
-  removeExercise: (index) =>
-    set((state) => ({
-      exercises: state.exercises.filter((_, i) => i !== index),
-      currentExerciseIndex: Math.max(0, state.currentExerciseIndex - 1),
-    })),
-
-  addSet: (exerciseIndex) =>
-    set((state) => {
-      const exercises = [...state.exercises];
-      const lastSet = exercises[exerciseIndex].sets.at(-1);
-      exercises[exerciseIndex] = {
-        ...exercises[exerciseIndex],
-        sets: [
-          ...exercises[exerciseIndex].sets,
-          { ...makeSet(), weight: lastSet?.weight ?? "", reps: lastSet?.reps ?? "" },
-        ],
-      };
-      return { exercises };
-    }),
-
-  updateSet: (exerciseIndex, setIndex, updates) =>
-    set((state) => {
-      const exercises = [...state.exercises];
-      exercises[exerciseIndex] = {
-        ...exercises[exerciseIndex],
-        sets: exercises[exerciseIndex].sets.map((s, i) =>
-          i === setIndex ? { ...s, ...updates } : s
-        ),
-      };
-      return { exercises };
-    }),
-
-  markSetLogged: (exerciseIndex, setIndex, isPR) =>
-    set((state) => {
-      const exercises = [...state.exercises];
-      exercises[exerciseIndex] = {
-        ...exercises[exerciseIndex],
-        sets: exercises[exerciseIndex].sets.map((s, i) =>
-          i === setIndex ? { ...s, logged: true, isPR } : s
-        ),
-      };
-      return { exercises };
-    }),
-
-  setCurrentExercise: (index) => set({ currentExerciseIndex: index }),
-
-  startRestTimer: (seconds) =>
-    set({ restSeconds: seconds, isResting: true }),
-
-  tickRest: () =>
-    set((state) => ({
-      restSeconds: Math.max(0, state.restSeconds - 1),
-      isResting: state.restSeconds > 1,
-    })),
-
-  tickElapsed: () =>
-    set((state) => ({ elapsedSeconds: state.elapsedSeconds + 1 })),
-
-  resetWorkout: () =>
-    set({
+export const useActiveWorkout = create<ActiveWorkoutState>()(
+  persist(
+    (set) => ({
       workoutId: null,
       workoutName: "",
       startedAt: null,
       exercises: [],
       currentExerciseIndex: 0,
-      restSeconds: 0,
-      isResting: false,
-      elapsedSeconds: 0,
+      restEndsAt: null,
+
+      startWorkout: (id, name) =>
+        set({ workoutId: id, workoutName: name, startedAt: new Date().toISOString() }),
+
+      addExercise: (exercise) =>
+        set((state) => ({
+          exercises: [
+            ...state.exercises,
+            { ...exercise, sets: [makeSet()] },
+          ],
+          currentExerciseIndex: state.exercises.length,
+        })),
+
+      removeExercise: (index) =>
+        set((state) => ({
+          exercises: state.exercises.filter((_, i) => i !== index),
+          currentExerciseIndex: Math.max(0, state.currentExerciseIndex - 1),
+        })),
+
+      addSet: (exerciseIndex) =>
+        set((state) => {
+          const exercises = [...state.exercises];
+          const lastSet = exercises[exerciseIndex].sets.at(-1);
+          exercises[exerciseIndex] = {
+            ...exercises[exerciseIndex],
+            sets: [
+              ...exercises[exerciseIndex].sets,
+              { ...makeSet(), weight: lastSet?.weight ?? "", reps: lastSet?.reps ?? "" },
+            ],
+          };
+          return { exercises };
+        }),
+
+      updateSet: (exerciseIndex, setIndex, updates) =>
+        set((state) => {
+          const exercises = [...state.exercises];
+          exercises[exerciseIndex] = {
+            ...exercises[exerciseIndex],
+            sets: exercises[exerciseIndex].sets.map((s, i) =>
+              i === setIndex ? { ...s, ...updates } : s
+            ),
+          };
+          return { exercises };
+        }),
+
+      markSetLogged: (exerciseIndex, setIndex, isPR) =>
+        set((state) => {
+          const exercises = [...state.exercises];
+          exercises[exerciseIndex] = {
+            ...exercises[exerciseIndex],
+            sets: exercises[exerciseIndex].sets.map((s, i) =>
+              i === setIndex ? { ...s, logged: true, isPR } : s
+            ),
+          };
+          return { exercises };
+        }),
+
+      setCurrentExercise: (index) => set({ currentExerciseIndex: index }),
+
+      startRest: (seconds) => set({ restEndsAt: Date.now() + seconds * 1000 }),
+
+      clearRest: () => set({ restEndsAt: null }),
+
+      resetWorkout: () =>
+        set({
+          workoutId: null,
+          workoutName: "",
+          startedAt: null,
+          exercises: [],
+          currentExerciseIndex: 0,
+          restEndsAt: null,
+        }),
     }),
-}));
+    { name: "fittrack-active-workout" }
+  )
+);

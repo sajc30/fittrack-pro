@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useActiveWorkout } from "@/lib/store/active-workout";
 import {
@@ -36,33 +36,36 @@ export function ActiveWorkoutView() {
   const [showPicker, setShowPicker] = useState(false);
   const [workoutName, setWorkoutName] = useState("Morning Workout");
   const [prFlash, setPrFlash] = useState(false);
-  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const restRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Persisted store rehydrates from localStorage after mount — render nothing until
+  // then so server and client markup agree.
+  const [hydrated, setHydrated] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => setHydrated(true), []);
 
   // Start or use existing workout
   const hasStarted = store.workoutId !== null;
+
+  // Timers derive from timestamps instead of counting ticks, so they stay correct
+  // through page refreshes and background-tab throttling.
+  const elapsedSeconds = store.startedAt
+    ? Math.max(0, Math.floor((now - new Date(store.startedAt).getTime()) / 1000))
+    : 0;
+  const restSeconds = store.restEndsAt
+    ? Math.max(0, Math.ceil((store.restEndsAt - now) / 1000))
+    : 0;
+  const isResting = restSeconds > 0;
 
   async function handleStart() {
     const data = await createWorkout.mutateAsync({ name: workoutName });
     store.startWorkout(data.id, workoutName);
   }
 
-  // Elapsed timer
   useEffect(() => {
     if (!hasStarted) return;
-    elapsedRef.current = setInterval(() => store.tickElapsed(), 1000);
-    return () => { if (elapsedRef.current) clearInterval(elapsedRef.current); };
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
   }, [hasStarted]);
-
-  // Rest timer
-  useEffect(() => {
-    if (store.isResting) {
-      restRef.current = setInterval(() => store.tickRest(), 1000);
-    } else {
-      if (restRef.current) clearInterval(restRef.current);
-    }
-    return () => { if (restRef.current) clearInterval(restRef.current); };
-  }, [store.isResting]);
 
   async function handleLogSet(exerciseIndex: number, setIndex: number) {
     if (!store.workoutId) return;
@@ -109,15 +112,17 @@ export function ActiveWorkoutView() {
     }
 
     store.markSetLogged(exerciseIndex, setIndex, isPR);
-    store.startRestTimer(DEFAULT_REST);
+    store.startRest(DEFAULT_REST);
   }
 
   async function handleFinish() {
     if (!store.workoutId || !store.startedAt) return;
-    await finishWorkout.mutateAsync({ workoutId: store.workoutId, startedAt: store.startedAt });
+    await finishWorkout.mutateAsync({ workoutId: store.workoutId, startedAt: new Date(store.startedAt) });
     store.resetWorkout();
     router.push("/workouts");
   }
+
+  if (!hydrated) return null;
 
   const currentEx = store.exercises[store.currentExerciseIndex];
 
@@ -161,12 +166,12 @@ export function ActiveWorkoutView() {
   return (
     <div className="h-screen flex flex-col" style={{ backgroundColor: "var(--color-void)" }}>
       {/* Rest timer bar at top */}
-      {store.isResting && (
+      {isResting && (
         <div className="h-0.5 w-full" style={{ backgroundColor: "var(--color-border)" }}>
           <div
             className="h-full transition-all duration-1000"
             style={{
-              width: `${(store.restSeconds / DEFAULT_REST) * 100}%`,
+              width: `${(restSeconds / DEFAULT_REST) * 100}%`,
               backgroundColor: "var(--color-amber)",
             }}
           />
@@ -188,7 +193,7 @@ export function ActiveWorkoutView() {
 
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ backgroundColor: "var(--color-surface)", border: "1px solid var(--color-border)" }}>
           <Clock className="w-3.5 h-3.5" style={{ color: "var(--color-amber)" }} />
-          <span className="text-sm font-semibold" style={{ color: "var(--color-amber)" }}>{formatTime(store.elapsedSeconds)}</span>
+          <span className="text-sm font-semibold" style={{ color: "var(--color-amber)" }}>{formatTime(elapsedSeconds)}</span>
         </div>
 
         <button
@@ -258,7 +263,7 @@ export function ActiveWorkoutView() {
           )}
 
           {/* Rest timer chip */}
-          {store.isResting && (
+          {isResting && (
             <div className="flex justify-center mt-3">
               <div
                 className="flex items-center gap-2 px-4 py-2 rounded-full"
@@ -266,9 +271,9 @@ export function ActiveWorkoutView() {
               >
                 <RotateCcw className="w-3.5 h-3.5" style={{ color: "var(--color-amber)" }} />
                 <span className="text-sm font-semibold" style={{ color: "var(--color-amber)" }}>
-                  Rest: {formatTime(store.restSeconds)}
+                  Rest: {formatTime(restSeconds)}
                 </span>
-                <button onClick={() => store.startRestTimer(0)} className="text-xs ml-1" style={{ color: "var(--color-text-ghost)" }}>
+                <button onClick={() => store.clearRest()} className="text-xs ml-1" style={{ color: "var(--color-text-ghost)" }}>
                   Skip
                 </button>
               </div>
