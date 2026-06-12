@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { calculateStreak, calculateWeeklyVolume, estimateOneRepMax } from "@fittrack/shared";
+import { calculateStreak, calculateWeeklyVolume } from "@fittrack/shared";
 
 export function useWorkouts(limit = 50) {
   const supabase = createClient();
@@ -192,7 +192,11 @@ export function useLogSet() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workouts"] }),
+    onSuccess: () => {
+      // The DB trigger may have updated personal_records
+      queryClient.invalidateQueries({ queryKey: ["workouts"] });
+      queryClient.invalidateQueries({ queryKey: ["prs"] });
+    },
   });
 }
 
@@ -202,56 +206,10 @@ export function useDeleteWorkout() {
 
   return useMutation({
     mutationFn: async (workoutId: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      // Collect which exercises were in this workout before deleting
-      const { data: setsInWorkout } = await supabase
-        .from("workout_sets")
-        .select("exercise_id")
-        .eq("workout_id", workoutId);
-
-      const affectedExerciseIds = [...new Set((setsInWorkout ?? []).map((s) => s.exercise_id))];
-
-      // Delete workout — sets cascade via FK
+      // Sets cascade via FK; the workout_sets_recalc_pr trigger keeps
+      // personal_records in sync transactionally.
       const { error } = await supabase.from("workouts").delete().eq("id", workoutId);
       if (error) throw error;
-
-      // Recalculate PRs for each affected exercise
-      for (const exerciseId of affectedExerciseIds) {
-        const { data: remaining } = await supabase
-          .from("workout_sets")
-          .select("weight_kg, reps, logged_at, workouts!inner(user_id)")
-          .eq("exercise_id", exerciseId)
-          .eq("workouts.user_id", user.id)
-          .not("weight_kg", "is", null)
-          .not("reps", "is", null);
-
-        if (!remaining || remaining.length === 0) {
-          // No sets left for this exercise — remove the stale PR
-          await supabase
-            .from("personal_records")
-            .delete()
-            .eq("user_id", user.id)
-            .eq("exercise_id", exerciseId);
-        } else {
-          // Find the best set by estimated 1RM
-          const best = remaining.reduce((top, s) =>
-            estimateOneRepMax(s.weight_kg!, s.reps!) > estimateOneRepMax(top.weight_kg!, top.reps!) ? s : top
-          );
-          await supabase.from("personal_records").upsert(
-            [{
-              user_id:               user.id,
-              exercise_id:           exerciseId,
-              weight_kg:             best.weight_kg!,
-              reps:                  best.reps!,
-              achieved_at:           best.logged_at,
-              estimated_one_rep_max: estimateOneRepMax(best.weight_kg!, best.reps!),
-            }],
-            { onConflict: "user_id,exercise_id" }
-          );
-        }
-      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["workouts"] });
@@ -288,19 +246,30 @@ export function useUpdateSet() {
       weight_kg,
       reps,
       rpe,
+      set_number,
     }: {
       setId: string;
       weight_kg: number;
       reps: number;
       rpe?: number | null;
+      set_number?: number;
     }) => {
       const { error } = await supabase
         .from("workout_sets")
-        .update({ weight_kg, reps, rpe: rpe ?? null })
+        .update({
+          weight_kg,
+          reps,
+          rpe: rpe ?? null,
+          ...(set_number !== undefined ? { set_number } : {}),
+        })
         .eq("id", setId);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workouts"] }),
+    onSuccess: () => {
+      // The DB trigger recalculates PRs when set weight/reps change
+      queryClient.invalidateQueries({ queryKey: ["workouts"] });
+      queryClient.invalidateQueries({ queryKey: ["prs"] });
+    },
   });
 }
 
@@ -316,28 +285,12 @@ export function useDeleteSet() {
         .eq("id", setId);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workouts"] }),
-  });
-}
-
-export function useUpsertPR() {
-  const supabase = createClient();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (pr: {
-      user_id: string;
-      exercise_id: string;
-      weight_kg: number;
-      reps: number;
-      estimated_one_rep_max: number;
-    }) => {
-      const { error } = await supabase.from("personal_records").upsert(
-        { ...pr, achieved_at: new Date().toISOString() },
-        { onConflict: "user_id,exercise_id" }
-      );
-      if (error) throw error;
+    onSuccess: () => {
+      // The DB trigger recalculates PRs; deleting an exercise's last set
+      // also changes which exercises are logged
+      queryClient.invalidateQueries({ queryKey: ["workouts"] });
+      queryClient.invalidateQueries({ queryKey: ["prs"] });
+      queryClient.invalidateQueries({ queryKey: ["logged-exercises"] });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["prs"] }),
   });
 }

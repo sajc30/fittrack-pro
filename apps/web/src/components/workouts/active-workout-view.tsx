@@ -7,7 +7,6 @@ import {
   useCreateWorkout,
   useFinishWorkout,
   useLogSet,
-  useUpsertPR,
 } from "@/lib/hooks/use-workouts";
 import { usePreviousSets, useExercisePRs } from "@/lib/hooks/use-prs";
 import { ExercisePicker } from "./exercise-picker";
@@ -31,7 +30,6 @@ export function ActiveWorkoutView() {
   const createWorkout = useCreateWorkout();
   const finishWorkout = useFinishWorkout();
   const logSet = useLogSet();
-  const upsertPR = useUpsertPR();
 
   const [showPicker, setShowPicker] = useState(false);
   const [workoutName, setWorkoutName] = useState("Morning Workout");
@@ -80,13 +78,14 @@ export function ActiveWorkoutView() {
     if (!user) return;
 
     const e1rm = estimateOneRepMax(weight, reps);
-    // Check for PR
+    // Read the current PR only to decide the celebration UX — the DB trigger
+    // on workout_sets is what actually maintains personal_records.
     const { data: currentPR } = await supabase
       .from("personal_records")
       .select("estimated_one_rep_max")
       .eq("user_id", user.id)
       .eq("exercise_id", ex.exerciseId)
-      .single();
+      .maybeSingle();
 
     const isPR = !currentPR || e1rm > (currentPR.estimated_one_rep_max ?? 0);
 
@@ -100,13 +99,6 @@ export function ActiveWorkoutView() {
     });
 
     if (isPR) {
-      await upsertPR.mutateAsync({
-        user_id: user.id,
-        exercise_id: ex.exerciseId,
-        weight_kg: weight,
-        reps,
-        estimated_one_rep_max: e1rm,
-      });
       setPrFlash(true);
       setTimeout(() => setPrFlash(false), 2500);
     }

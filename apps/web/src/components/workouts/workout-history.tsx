@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   useWorkouts,
@@ -11,8 +11,8 @@ import {
   useLogSet,
 } from "@/lib/hooks/use-workouts";
 import {
-  Clock, Dumbbell, Trophy, ChevronDown, ChevronUp,
-  Plus, Trash2, Pencil, Check, X, Loader2, MoreHorizontal,
+  Clock, ChevronDown, ChevronUp,
+  Plus, Trash2, Pencil, Check, Loader2, MoreHorizontal,
 } from "lucide-react";
 import { formatWorkoutDate } from "@fittrack/shared";
 import { MUSCLE_GROUP_LABELS } from "@fittrack/shared";
@@ -55,7 +55,6 @@ interface DraftSet {
 }
 
 function EditExerciseBlock({
-  exerciseId,
   exerciseName,
   muscle,
   sets,
@@ -63,7 +62,6 @@ function EditExerciseBlock({
   onChangeSet,
   onMarkDelete,
 }: {
-  exerciseId: string;
   exerciseName: string;
   muscle: string;
   sets: DraftSet[];
@@ -72,13 +70,13 @@ function EditExerciseBlock({
   onMarkDelete: (idx: number) => void;
 }) {
   const inputStyle = {
-    backgroundColor: "var(--color-inset)",
-    border: "1px solid var(--color-border)",
+    backgroundColor: "var(--color-sheet-inset)",
+    border: "1px solid var(--color-line)",
     color: "var(--color-text-primary)",
-    borderRadius: 8,
+    borderRadius: 2,
     padding: "7px 10px",
     fontSize: 14,
-    fontWeight: 600,
+    fontFamily: "var(--font-mono)",
     outline: "none",
     textAlign: "center" as const,
     width: "100%",
@@ -89,14 +87,11 @@ function EditExerciseBlock({
   return (
     <div>
       {/* Exercise label */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-baseline gap-3 mb-3">
         <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
           {exerciseName}
         </p>
-        <span
-          className="label-caps px-2 py-0.5 rounded"
-          style={{ color: "var(--color-amber)", backgroundColor: "var(--color-amber-dim)" }}
-        >
+        <span className="label-caps" style={{ fontSize: 11 }}>
           {MUSCLE_GROUP_LABELS[muscle as MuscleGroup] ?? muscle}
         </span>
       </div>
@@ -104,7 +99,7 @@ function EditExerciseBlock({
       {/* Column headers */}
       <div className="grid grid-cols-12 gap-2 px-1 mb-1.5">
         <span className="col-span-1 label-caps text-center">#</span>
-        <span className="col-span-5 label-caps">Weight (kg)</span>
+        <span className="col-span-5 label-caps">Load (kg)</span>
         <span className="col-span-4 label-caps">Reps</span>
         <span className="col-span-2" />
       </div>
@@ -117,8 +112,8 @@ function EditExerciseBlock({
           return (
             <div key={idx} className="grid grid-cols-12 gap-2 items-center">
               <span
-                className="col-span-1 text-xs font-bold text-center"
-                style={{ color: "var(--color-text-ghost)" }}
+                className="col-span-1 text-center font-display"
+                style={{ color: "var(--color-text-ghost)", fontSize: 12 }}
               >
                 {displayNum}
               </span>
@@ -131,8 +126,8 @@ function EditExerciseBlock({
                   onChange={(e) => onChangeSet(idx, "weight", e.target.value)}
                   placeholder="—"
                   style={inputStyle}
-                  onFocus={(e) => (e.target.style.borderColor = "var(--color-amber)")}
-                  onBlur={(e)  => (e.target.style.borderColor = "var(--color-border)")}
+                  onFocus={(e) => (e.target.style.borderColor = "var(--color-redline)")}
+                  onBlur={(e)  => (e.target.style.borderColor = "var(--color-line)")}
                 />
               </div>
 
@@ -143,18 +138,19 @@ function EditExerciseBlock({
                   onChange={(e) => onChangeSet(idx, "reps", e.target.value)}
                   placeholder="—"
                   style={inputStyle}
-                  onFocus={(e) => (e.target.style.borderColor = "var(--color-amber)")}
-                  onBlur={(e)  => (e.target.style.borderColor = "var(--color-border)")}
+                  onFocus={(e) => (e.target.style.borderColor = "var(--color-redline)")}
+                  onBlur={(e)  => (e.target.style.borderColor = "var(--color-line)")}
                 />
               </div>
 
               <div className="col-span-2 flex justify-center">
                 <button
                   onClick={() => onMarkDelete(idx)}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-red-950"
-                  title="Remove set"
+                  className="w-7 h-7 flex items-center justify-center transition-all hover:bg-[var(--color-sheet-raised)]"
+                  style={{ borderRadius: 2 }}
+                  title="Strike set"
                 >
-                  <Trash2 className="w-3.5 h-3.5" style={{ color: "var(--color-red)" }} />
+                  <Trash2 className="w-3.5 h-3.5" style={{ color: "var(--color-redline)" }} />
                 </button>
               </div>
             </div>
@@ -165,8 +161,7 @@ function EditExerciseBlock({
       {/* Add set */}
       <button
         onClick={onAddSet}
-        className="mt-2.5 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:bg-[var(--color-raised)]"
-        style={{ color: "var(--color-text-secondary)", border: "1px solid var(--color-border)" }}
+        className="bp-btn-outline mt-2.5 flex items-center gap-1.5 px-3 py-1.5"
       >
         <Plus className="w-3.5 h-3.5" /> Add set
       </button>
@@ -174,7 +169,7 @@ function EditExerciseBlock({
   );
 }
 
-// ─── Edit-mode panel ──────────────────────────────────────────────────────────
+// ─── Edit-mode panel — red markup, like a drawing revision ───────────────────
 
 function EditWorkoutPanel({
   workout,
@@ -188,6 +183,7 @@ function EditWorkoutPanel({
   const logSet     = useLogSet();
 
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Build draft state grouped by exercise
   type ExBlock = {
@@ -221,10 +217,6 @@ function EditWorkoutPanel({
   };
 
   const [blocks, setBlocks] = useState<ExBlock[]>(buildDraft);
-
-  function updateBlock(blockIdx: number, newSets: DraftSet[]) {
-    setBlocks((prev) => prev.map((b, i) => i === blockIdx ? { ...b, sets: newSets } : b));
-  }
 
   function handleAddSet(blockIdx: number) {
     const prev = blocks[blockIdx].sets.filter((s) => !s.toDelete).at(-1);
@@ -272,13 +264,12 @@ function EditWorkoutPanel({
 
   async function handleSave() {
     setSaving(true);
+    setSaveError(null);
     const ops: Promise<unknown>[] = [];
 
     for (const block of blocks) {
       const activeSets = block.sets.filter((s) => !s.toDelete);
-      for (let i = 0; i < block.sets.length; i++) {
-        const s = block.sets[i];
-
+      for (const s of block.sets) {
         if (s.toDelete && s.id) {
           ops.push(deleteSet.mutateAsync(s.id));
           continue;
@@ -289,12 +280,12 @@ function EditWorkoutPanel({
         const r = parseInt(s.reps);
         if (!w || !r || isNaN(w) || isNaN(r)) continue;
 
+        // Renumber by position so set numbers stay gapless after deletes
+        const setNum = activeSets.indexOf(s) + 1;
+
         if (s.id) {
-          // Existing set — update
-          ops.push(updateSet.mutateAsync({ setId: s.id, weight_kg: w, reps: r }));
+          ops.push(updateSet.mutateAsync({ setId: s.id, weight_kg: w, reps: r, set_number: setNum }));
         } else {
-          // New set — insert
-          const setNum = activeSets.indexOf(s) + 1;
           ops.push(
             logSet.mutateAsync({
               workout_id: workout.id,
@@ -309,43 +300,62 @@ function EditWorkoutPanel({
       }
     }
 
-    await Promise.all(ops);
-    setSaving(false);
-    onClose();
+    try {
+      await Promise.all(ops);
+      onClose();
+    } catch {
+      setSaveError("Some changes failed to save. Check your connection and try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
-    <div className="border-t" style={{ borderColor: "var(--color-border)" }}>
-      {/* Header */}
+    <div className="border-t" style={{ borderColor: "var(--color-redline)" }}>
+      {/* Header — revision markup */}
       <div
         className="flex items-center justify-between px-5 py-3 border-b"
-        style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-raised)" }}
+        style={{
+          borderColor: "var(--color-line)",
+          backgroundColor: "color-mix(in srgb, var(--color-redline) 6%, transparent)",
+        }}
       >
-        <div className="flex items-center gap-2">
-          <Pencil className="w-3.5 h-3.5" style={{ color: "var(--color-amber)" }} />
-          <span className="text-sm font-semibold" style={{ color: "var(--color-amber)" }}>
-            Editing workout
+        <div className="flex items-center gap-2.5">
+          <Pencil className="w-3.5 h-3.5" style={{ color: "var(--color-redline)" }} />
+          <span
+            className="font-display"
+            style={{ color: "var(--color-redline)", fontSize: 12, letterSpacing: "0.14em" }}
+          >
+            REVISION MODE
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={onClose}
-            className="h-8 px-3 rounded-lg text-xs font-semibold transition-all"
-            style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}
-          >
+          <button onClick={onClose} className="bp-btn-outline h-8 px-3">
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="h-8 px-4 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all disabled:opacity-50"
-            style={{ backgroundColor: "var(--color-amber)", color: "var(--color-void)" }}
+            className="bp-btn h-8 px-4 flex items-center gap-1.5"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? "Saving…" : "Save revision"}
           </button>
         </div>
       </div>
+
+      {saveError && (
+        <p
+          className="mx-5 mt-3 px-3 py-2 text-sm"
+          style={{
+            color: "var(--color-redline)",
+            border: "1px solid var(--color-redline)",
+            borderRadius: 2,
+          }}
+        >
+          {saveError}
+        </p>
+      )}
 
       {/* Blocks */}
       <div className="px-5 py-4 space-y-6">
@@ -355,7 +365,6 @@ function EditWorkoutPanel({
           return (
             <EditExerciseBlock
               key={block.exerciseId}
-              exerciseId={block.exerciseId}
               exerciseName={block.name}
               muscle={block.muscle}
               sets={block.sets}
@@ -366,12 +375,11 @@ function EditWorkoutPanel({
           );
         })}
       </div>
-
     </div>
   );
 }
 
-// ─── Read-only expanded sets view ─────────────────────────────────────────────
+// ─── Read-only expanded sets view — drafting table ───────────────────────────
 
 function ReadOnlySets({
   byExercise,
@@ -381,7 +389,7 @@ function ReadOnlySets({
   if (Object.keys(byExercise).length === 0) {
     return (
       <p className="px-5 py-4 text-sm text-center" style={{ color: "var(--color-text-ghost)" }}>
-        No sets logged for this workout.
+        No sets on record for this session.
       </p>
     );
   }
@@ -390,49 +398,40 @@ function ReadOnlySets({
     <div className="px-5 py-4 space-y-5">
       {Object.entries(byExercise).map(([id, ex]) => (
         <div key={id}>
-          <div className="flex items-center gap-2 mb-2.5">
+          <div className="flex items-baseline gap-3 mb-1.5">
             <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
               {ex.name}
             </p>
-            <span
-              className="label-caps px-2 py-0.5 rounded"
-              style={{ color: "var(--color-amber)", backgroundColor: "var(--color-amber-dim)" }}
-            >
+            <span className="label-caps" style={{ fontSize: 11 }}>
               {MUSCLE_GROUP_LABELS[ex.muscle as MuscleGroup] ?? ex.muscle}
             </span>
           </div>
 
-          <div className="space-y-1.5">
-            {ex.sets.map((s) => (
+          <div>
+            {ex.sets.map((s, i) => (
               <div
                 key={s.id}
-                className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
+                className="flex items-center gap-4 py-2 px-2"
                 style={{
-                  backgroundColor: s.is_pr ? "var(--color-amber-dim)" : "var(--color-inset)",
-                  border: `1px solid ${s.is_pr ? "var(--color-amber)" : "var(--color-border)"}`,
+                  borderBottom: i < ex.sets.length - 1 ? "1px solid var(--color-line)" : "none",
                 }}
               >
                 <span
-                  className="text-xs font-bold w-5 text-center shrink-0"
-                  style={{ color: s.is_pr ? "var(--color-amber)" : "var(--color-text-ghost)" }}
+                  className="font-display w-5 text-center shrink-0"
+                  style={{ color: "var(--color-text-ghost)", fontSize: 12 }}
                 >
-                  {s.set_number}
+                  {i + 1}
                 </span>
-                <span className="text-sm font-bold flex-1" style={{ color: s.is_pr ? "var(--color-amber)" : "var(--color-text-primary)" }}>
+                <span
+                  className="font-display flex-1"
+                  style={{ color: "var(--color-text-primary)", fontSize: 14 }}
+                >
                   {s.weight_kg ?? "—"}
-                  <span className="text-xs font-normal" style={{ color: "var(--color-text-secondary)" }}> kg</span>
+                  <span style={{ color: "var(--color-text-ghost)", fontSize: 12 }}> KG</span>
                   <span className="mx-2" style={{ color: "var(--color-text-ghost)" }}>×</span>
                   {s.reps ?? "—"}
-                  <span className="text-xs font-normal" style={{ color: "var(--color-text-secondary)" }}> reps</span>
                 </span>
-                {s.is_pr && (
-                  <span
-                    className="text-xs font-bold px-1.5 py-0.5 rounded tracking-wider shrink-0"
-                    style={{ backgroundColor: "var(--color-amber)", color: "var(--color-void)" }}
-                  >
-                    PR
-                  </span>
-                )}
+                {s.is_pr && <span className="stamp shrink-0">PR</span>}
               </div>
             ))}
           </div>
@@ -442,9 +441,9 @@ function ReadOnlySets({
   );
 }
 
-// ─── Workout card ─────────────────────────────────────────────────────────────
+// ─── Workout card — one numbered session sheet ───────────────────────────────
 
-function WorkoutCard({ workout }: { workout: Workout }) {
+function WorkoutCard({ workout, sessionNo }: { workout: Workout; sessionNo: number }) {
   const deleteWorkout = useDeleteWorkout();
   const updateWorkout = useUpdateWorkout();
 
@@ -481,26 +480,29 @@ function WorkoutCard({ workout }: { workout: Workout }) {
 
   return (
     <div
-      className="rounded-xl border"
-      style={{ backgroundColor: "var(--color-surface)", borderColor: editing ? "var(--color-amber)" : "var(--color-border)", transition: "border-color 150ms" }}
+      className="sheet"
+      style={{ borderColor: editing ? "var(--color-redline)" : undefined }}
     >
       {/* ── Header ── */}
       <div className="px-5 py-4">
 
-        {/* Date row + actions */}
+        {/* Session no. + date + actions */}
         <div className="flex items-center justify-between mb-1">
-          <p className="label-caps">{formatWorkoutDate(workout.started_at)}</p>
+          <div className="flex items-baseline gap-3">
+            <span className="fig-label">Session {String(sessionNo).padStart(3, "0")}</span>
+            <span className="label-caps" style={{ fontSize: 11 }}>
+              {formatWorkoutDate(workout.started_at)}
+            </span>
+          </div>
 
           <div className="flex items-center gap-0.5">
-            {/* Edit shortcut pill */}
             {!editing && (
               <button
                 onClick={handleOpenEdit}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold mr-1 transition-all hover:bg-[var(--color-raised)]"
-                style={{ color: "var(--color-text-primary)", border: "1px solid var(--color-border-bright)" }}
+                className="bp-btn-outline flex items-center gap-1.5 px-2.5 py-1 mr-1"
               >
                 <Pencil className="w-3 h-3" />
-                Edit
+                Mark up
               </button>
             )}
 
@@ -508,7 +510,8 @@ function WorkoutCard({ workout }: { workout: Workout }) {
             <div className="relative">
               <button
                 onClick={() => setMenuOpen((v) => !v)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-[var(--color-raised)]"
+                className="w-7 h-7 flex items-center justify-center transition-all hover:bg-[var(--color-sheet-raised)]"
+                style={{ borderRadius: 2 }}
               >
                 <MoreHorizontal className="w-4 h-4" style={{ color: "var(--color-text-secondary)" }} />
               </button>
@@ -516,29 +519,29 @@ function WorkoutCard({ workout }: { workout: Workout }) {
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
                   <div
-                    className="absolute right-0 top-8 z-20 rounded-xl border py-1 min-w-[168px] shadow-2xl"
-                    style={{ backgroundColor: "var(--color-raised)", borderColor: "var(--color-border-bright)" }}
+                    className="absolute right-0 top-8 z-20 border py-1 min-w-[168px]"
+                    style={{
+                      backgroundColor: "var(--color-sheet-raised)",
+                      borderColor: "var(--color-line-bright)",
+                      borderRadius: 2,
+                    }}
                   >
                     <button
                       onClick={() => { setMenuOpen(false); setExpanded(true); setEditingName(true); }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-left transition-all"
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-left transition-all hover:bg-[var(--color-line)]"
                       style={{ color: "var(--color-text-primary)" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-border)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                     >
                       <span className="w-3.5 h-3.5 shrink-0 flex items-center justify-center text-xs" style={{ color: "var(--color-text-ghost)" }}>Aa</span>
-                      Rename workout
+                      Rename session
                     </button>
-                    <div className="h-px my-1" style={{ backgroundColor: "var(--color-border)" }} />
+                    <div className="h-px my-1" style={{ backgroundColor: "var(--color-line)" }} />
                     <button
                       onClick={() => { setMenuOpen(false); setShowDeleteConf(true); }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-left transition-all"
-                      style={{ color: "var(--color-red)" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(220,38,38,0.08)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-left transition-all hover:bg-[color-mix(in_srgb,var(--color-redline)_10%,transparent)]"
+                      style={{ color: "var(--color-redline)" }}
                     >
                       <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                      Delete workout
+                      Void session
                     </button>
                   </div>
                 </>
@@ -548,7 +551,8 @@ function WorkoutCard({ workout }: { workout: Workout }) {
             {/* Chevron */}
             <button
               onClick={() => { setExpanded((v) => !v); if (editing) setEditing(false); }}
-              className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-[var(--color-raised)]"
+              className="w-7 h-7 flex items-center justify-center transition-all hover:bg-[var(--color-sheet-raised)]"
+              style={{ borderRadius: 2 }}
             >
               {expanded
                 ? <ChevronUp   className="w-4 h-4" style={{ color: "var(--color-text-secondary)" }} />
@@ -569,22 +573,26 @@ function WorkoutCard({ workout }: { workout: Workout }) {
                 if (e.key === "Enter")  handleSaveName();
                 if (e.key === "Escape") { setNameValue(workout.name); setEditingName(false); }
               }}
-              className="flex-1 text-base font-semibold px-3 py-1.5 rounded-lg"
-              style={{ backgroundColor: "var(--color-inset)", border: "1px solid var(--color-amber)", color: "var(--color-text-primary)", outline: "none" }}
+              className="flex-1 text-base font-semibold px-3 py-1.5"
+              style={{
+                backgroundColor: "var(--color-sheet-inset)",
+                border: "1px solid var(--color-paper)",
+                color: "var(--color-text-primary)",
+                borderRadius: 2,
+                outline: "none",
+              }}
             />
             <button
               onClick={handleSaveName}
               disabled={updateWorkout.isPending}
-              className="h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 shrink-0 disabled:opacity-50"
-              style={{ backgroundColor: "var(--color-green)", color: "white" }}
+              className="bp-btn h-8 px-3 flex items-center gap-1.5 shrink-0"
             >
               {updateWorkout.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               Save
             </button>
             <button
               onClick={() => { setNameValue(workout.name); setEditingName(false); }}
-              className="h-8 px-3 rounded-lg text-xs font-semibold shrink-0"
-              style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}
+              className="bp-btn-outline h-8 px-3 shrink-0"
             >
               Cancel
             </button>
@@ -597,32 +605,34 @@ function WorkoutCard({ workout }: { workout: Workout }) {
           >
             {workout.name}
             {editing && (
-              <span className="ml-2 text-xs font-semibold" style={{ color: "var(--color-amber)" }}>
-                — editing
+              <span
+                className="ml-2 font-display"
+                style={{ color: "var(--color-redline)", fontSize: 11, letterSpacing: "0.12em" }}
+              >
+                — IN REVISION
               </span>
             )}
           </p>
         )}
 
-        {/* Meta */}
+        {/* Meta annotations */}
         {!editingName && (
-          <div className="flex items-center gap-4 mt-2 flex-wrap cursor-pointer" onClick={() => setExpanded((v) => !v)}>
+          <div
+            className="flex items-center gap-4 mt-2 flex-wrap cursor-pointer font-display"
+            style={{ fontSize: 12, letterSpacing: "0.06em", color: "var(--color-text-secondary)" }}
+            onClick={() => setExpanded((v) => !v)}
+          >
             {workout.duration_minutes != null && workout.duration_minutes > 0 && (
-              <span className="flex items-center gap-1.5 text-xs" style={{ color: "var(--color-text-secondary)" }}>
-                <Clock className="w-3.5 h-3.5" />{workout.duration_minutes} min
+              <span className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" style={{ color: "var(--color-text-ghost)" }} />
+                {workout.duration_minutes} MIN
               </span>
             )}
-            <span className="flex items-center gap-1.5 text-xs" style={{ color: "var(--color-text-secondary)" }}>
-              <Dumbbell className="w-3.5 h-3.5" />{sets.length} set{sets.length !== 1 ? "s" : ""}
-            </span>
-            {totalVolume > 0 && (
-              <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>
-                {(totalVolume / 1000).toFixed(1)}t volume
-              </span>
-            )}
+            <span>{sets.length} SET{sets.length !== 1 ? "S" : ""}</span>
+            {totalVolume > 0 && <span>{(totalVolume / 1000).toFixed(1)} T</span>}
             {prCount > 0 && (
-              <span className="flex items-center gap-1 text-xs font-bold" style={{ color: "var(--color-amber)" }}>
-                <Trophy className="w-3.5 h-3.5" />{prCount} PR{prCount > 1 ? "s" : ""}
+              <span style={{ color: "var(--color-redline)" }}>
+                {prCount} PR{prCount > 1 ? "S" : ""}
               </span>
             )}
           </div>
@@ -631,31 +641,39 @@ function WorkoutCard({ workout }: { workout: Workout }) {
         {/* Delete confirmation */}
         {showDeleteConf && (
           <div
-            className="mt-3 rounded-xl px-4 py-3 flex items-center justify-between gap-3"
-            style={{ backgroundColor: "rgba(220,38,38,0.07)", border: "1px solid rgba(220,38,38,0.25)" }}
+            className="mt-3 px-4 py-3 flex items-center justify-between gap-3"
+            style={{
+              border: "1px solid var(--color-redline)",
+              borderRadius: 2,
+              backgroundColor: "color-mix(in srgb, var(--color-redline) 6%, transparent)",
+            }}
           >
             <div>
-              <p className="text-sm font-semibold" style={{ color: "var(--color-red)" }}>Delete workout?</p>
+              <p className="text-sm font-semibold" style={{ color: "var(--color-redline)" }}>
+                Void this session?
+              </p>
               <p className="text-xs mt-0.5" style={{ color: "var(--color-text-secondary)" }}>
-                All sets will be removed. This cannot be undone.
+                All sets are removed and records recalculate. This cannot be undone.
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => setShowDeleteConf(false)}
-                className="h-8 px-3 rounded-lg text-xs font-semibold"
-                style={{ border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}
-              >
+              <button onClick={() => setShowDeleteConf(false)} className="bp-btn-outline h-8 px-3">
                 Cancel
               </button>
               <button
                 onClick={() => deleteWorkout.mutate(workout.id)}
                 disabled={deleteWorkout.isPending}
-                className="h-8 px-4 rounded-lg text-xs font-bold flex items-center gap-1.5 disabled:opacity-60"
-                style={{ backgroundColor: "var(--color-red)", color: "white" }}
+                className="h-8 px-4 font-display flex items-center gap-1.5 disabled:opacity-60"
+                style={{
+                  backgroundColor: "var(--color-redline)",
+                  color: "var(--color-ink)",
+                  fontSize: 12,
+                  letterSpacing: "0.1em",
+                  borderRadius: 2,
+                }}
               >
                 {deleteWorkout.isPending && <Loader2 className="w-3 h-3 animate-spin" />}
-                Delete
+                VOID
               </button>
             </div>
           </div>
@@ -667,7 +685,7 @@ function WorkoutCard({ workout }: { workout: Workout }) {
         editing
           ? <EditWorkoutPanel workout={workout} onClose={() => setEditing(false)} />
           : (
-            <div className="border-t" style={{ borderColor: "var(--color-border)" }}>
+            <div className="border-t" style={{ borderColor: "var(--color-line)" }}>
               <ReadOnlySets byExercise={byExercise} />
             </div>
           )
@@ -685,7 +703,7 @@ export function WorkoutHistory() {
     return (
       <div className="space-y-3">
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="skeleton h-24 rounded-xl" />
+          <div key={i} className="skeleton h-24" />
         ))}
       </div>
     );
@@ -693,30 +711,25 @@ export function WorkoutHistory() {
 
   if (!workouts || workouts.length === 0) {
     return (
-      <div className="text-center py-20">
-        <Dumbbell className="w-10 h-10 mx-auto mb-4" style={{ color: "var(--color-text-ghost)" }} />
-        <p className="text-lg font-semibold mb-2" style={{ color: "var(--color-text-primary)" }}>
-          No workouts yet
-        </p>
+      <div className="sheet sheet-frame text-center py-20 px-8">
+        <p className="fig-label mb-3">No sessions on file</p>
         <p className="text-sm mb-6" style={{ color: "var(--color-text-secondary)" }}>
-          Start logging sessions to see your history here.
+          Open your first sheet and start logging sets — the drawing set builds itself from here.
         </p>
-        <Link
-          href="/workouts/new"
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm"
-          style={{ backgroundColor: "var(--color-amber)", color: "var(--color-void)" }}
-        >
+        <Link href="/workouts/new" className="bp-btn inline-flex items-center gap-2 px-5 py-2.5">
           <Plus className="w-4 h-4" />
-          Start First Workout
+          Begin session 001
         </Link>
       </div>
     );
   }
 
+  const total = workouts.length;
+
   return (
     <div className="space-y-3">
-      {(workouts as unknown as Workout[]).map((workout) => (
-        <WorkoutCard key={workout.id} workout={workout} />
+      {(workouts as unknown as Workout[]).map((workout, i) => (
+        <WorkoutCard key={workout.id} workout={workout} sessionNo={total - i} />
       ))}
     </div>
   );
