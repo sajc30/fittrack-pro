@@ -10,22 +10,16 @@ type Exercise   = Database["public"]["Tables"]["exercises"]["Row"];
 type MuscleGroup = Database["public"]["Enums"]["muscle_group"];
 type Equipment  = Database["public"]["Enums"]["equipment_type"];
 
-const EQUIPMENT_OPTIONS: { value: Equipment; label: string; emoji: string }[] = [
-  { value: "barbell",    label: "Barbell",    emoji: "🏋️" },
-  { value: "dumbbell",   label: "Dumbbell",   emoji: "💪" },
-  { value: "cable",      label: "Cable",      emoji: "🔗" },
-  { value: "machine",    label: "Machine",    emoji: "⚙️" },
-  { value: "bodyweight", label: "Bodyweight", emoji: "🤸" },
-  { value: "kettlebell", label: "Kettlebell", emoji: "🔔" },
-  { value: "bands",      label: "Bands",      emoji: "〰️" },
-  { value: "other",      label: "Other",      emoji: "➕" },
+const EQUIPMENT_OPTIONS: { value: Equipment; label: string }[] = [
+  { value: "barbell",    label: "Barbell" },
+  { value: "dumbbell",   label: "Dumbbell" },
+  { value: "cable",      label: "Cable" },
+  { value: "machine",    label: "Machine" },
+  { value: "bodyweight", label: "Bodyweight" },
+  { value: "kettlebell", label: "Kettlebell" },
+  { value: "bands",      label: "Bands" },
+  { value: "other",      label: "Other" },
 ];
-
-const EQUIPMENT_COLOR: Record<string, string> = {
-  barbell: "#F59E0B", dumbbell: "#3B82F6", cable: "#8B5CF6",
-  machine: "#6B7280", bodyweight: "#16A34A", kettlebell: "#EF4444",
-  bands: "#EC4899", other: "#9CA3AF",
-};
 
 type FilterTab = "muscle" | "equipment";
 
@@ -50,31 +44,30 @@ export function ExercisePicker({ onSelect, onClose }: Props) {
     setEquipment("all");
   }
 
-  const chipStyle = (active: boolean, color?: string) => ({
-    backgroundColor: active ? (color ?? "var(--color-amber)") : "var(--color-surface)",
-    color: active ? (color ? "white" : "var(--color-void)") : "var(--color-text-secondary)",
-    border: `1px solid ${active ? (color ?? "var(--color-amber)") : "var(--color-border)"}`,
+  const chip = (active: boolean) => ({
+    fontFamily: "var(--font-mono)",
+    fontSize: 11,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase" as const,
+    borderRadius: 2,
+    backgroundColor: active ? "var(--color-paper)" : "transparent",
+    color: active ? "var(--color-ink)" : "var(--color-text-secondary)",
+    border: `1px solid ${active ? "var(--color-paper)" : "var(--color-line)"}`,
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: "var(--color-void)" }}>
+    <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: "var(--color-ink)" }}>
       {/* Header */}
       <div
         className="flex items-center gap-3 px-5 py-4 border-b shrink-0"
-        style={{ borderColor: "var(--color-border)" }}
+        style={{ borderColor: "var(--color-line)", backgroundColor: "var(--color-sheet)" }}
       >
-        <button onClick={onClose} className="p-1.5 rounded-lg" style={{ color: "var(--color-text-secondary)" }}>
+        <button onClick={onClose} className="p-1.5" style={{ color: "var(--color-text-secondary)", borderRadius: 2 }}>
           <X className="w-5 h-5" />
         </button>
-        <h2 className="font-semibold text-base flex-1" style={{ color: "var(--color-text-primary)" }}>
-          Choose Exercise
-        </h2>
+        <h2 className="fig-label flex-1">Index — choose exercise</h2>
         {activeFilterCount > 0 && (
-          <button
-            onClick={clearAll}
-            className="text-xs font-medium px-2.5 py-1 rounded-lg"
-            style={{ color: "var(--color-amber)", border: "1px solid var(--color-amber-dim)", backgroundColor: "var(--color-amber-dim)" }}
-          >
+          <button onClick={clearAll} className="bp-btn-outline px-2.5 py-1">
             Clear {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""}
           </button>
         )}
@@ -92,36 +85,47 @@ export function ExercisePicker({ onSelect, onClose }: Props) {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search exercises…"
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm"
+            placeholder="Search the index…"
+            className="w-full pl-10 pr-4 py-2.5 text-sm"
             style={{
-              backgroundColor: "var(--color-surface)",
-              border: "1px solid var(--color-border)",
+              backgroundColor: "var(--color-sheet-inset)",
+              border: "1px solid var(--color-line)",
               color: "var(--color-text-primary)",
+              borderRadius: 2,
               outline: "none",
             }}
-            onFocus={(e) => (e.target.style.borderColor = "var(--color-amber)")}
-            onBlur={(e)  => (e.target.style.borderColor = "var(--color-border)")}
+            onFocus={(e) => (e.target.style.borderColor = "var(--color-paper)")}
+            onBlur={(e)  => (e.target.style.borderColor = "var(--color-line)")}
           />
         </div>
       </div>
 
       {/* Filter tabs */}
       <div className="px-5 pb-2 shrink-0">
-        <div className="flex gap-1 p-1 rounded-xl" style={{ backgroundColor: "var(--color-surface)", border: "1px solid var(--color-border)" }}>
-          {(["equipment", "muscle"] as FilterTab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className="flex-1 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all duration-[120ms]"
-              style={{
-                backgroundColor: tab === t ? "var(--color-amber)" : "transparent",
-                color: tab === t ? "var(--color-void)" : "var(--color-text-secondary)",
-              }}
-            >
-              {t}{t === "equipment" && equipment !== "all" ? " ✓" : ""}{t === "muscle" && muscle !== "all" ? " ✓" : ""}
-            </button>
-          ))}
+        <div
+          className="flex gap-1 p-1"
+          style={{ backgroundColor: "var(--color-sheet)", border: "1px solid var(--color-line)", borderRadius: 2 }}
+        >
+          {(["equipment", "muscle"] as FilterTab[]).map((t) => {
+            const active = tab === t;
+            const filtered = (t === "equipment" && equipment !== "all") || (t === "muscle" && muscle !== "all");
+            return (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className="flex-1 py-1.5 font-display uppercase transition-all duration-150"
+                style={{
+                  fontSize: 11,
+                  letterSpacing: "0.1em",
+                  borderRadius: 1,
+                  backgroundColor: active ? "var(--color-paper)" : "transparent",
+                  color: active ? "var(--color-ink)" : "var(--color-text-secondary)",
+                }}
+              >
+                {t}{filtered ? " ◆" : ""}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -130,8 +134,8 @@ export function ExercisePicker({ onSelect, onClose }: Props) {
         <div className="flex gap-2 px-5 pb-3 overflow-x-auto shrink-0">
           <button
             onClick={() => setEquipment("all")}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all duration-[120ms]"
-            style={chipStyle(equipment === "all")}
+            className="px-3 py-1.5 whitespace-nowrap shrink-0 transition-all duration-150"
+            style={chip(equipment === "all")}
           >
             All
           </button>
@@ -139,10 +143,9 @@ export function ExercisePicker({ onSelect, onClose }: Props) {
             <button
               key={eq.value}
               onClick={() => setEquipment(equipment === eq.value ? "all" : eq.value)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 flex items-center gap-1.5 transition-all duration-[120ms]"
-              style={chipStyle(equipment === eq.value, EQUIPMENT_COLOR[eq.value])}
+              className="px-3 py-1.5 whitespace-nowrap shrink-0 transition-all duration-150"
+              style={chip(equipment === eq.value)}
             >
-              <span>{eq.emoji}</span>
               {eq.label}
             </button>
           ))}
@@ -154,8 +157,8 @@ export function ExercisePicker({ onSelect, onClose }: Props) {
         <div className="flex gap-2 px-5 pb-3 overflow-x-auto shrink-0">
           <button
             onClick={() => setMuscle("all")}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all duration-[120ms]"
-            style={chipStyle(muscle === "all")}
+            className="px-3 py-1.5 whitespace-nowrap shrink-0 transition-all duration-150"
+            style={chip(muscle === "all")}
           >
             All
           </button>
@@ -163,8 +166,8 @@ export function ExercisePicker({ onSelect, onClose }: Props) {
             <button
               key={mg}
               onClick={() => setMuscle(muscle === mg ? "all" : (mg as MuscleGroup))}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all duration-[120ms]"
-              style={chipStyle(muscle === mg)}
+              className="px-3 py-1.5 whitespace-nowrap shrink-0 transition-all duration-150"
+              style={chip(muscle === mg)}
             >
               {MUSCLE_GROUP_LABELS[mg]}
             </button>
@@ -175,7 +178,7 @@ export function ExercisePicker({ onSelect, onClose }: Props) {
       {/* Result count */}
       {!isLoading && (
         <div className="px-5 pb-2 shrink-0">
-          <p className="label-caps">{exercises?.length ?? 0} exercises</p>
+          <p className="label-caps">{exercises?.length ?? 0} on file</p>
         </div>
       )}
 
@@ -184,19 +187,15 @@ export function ExercisePicker({ onSelect, onClose }: Props) {
         {isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="skeleton h-14 rounded-xl" />
+              <div key={i} className="skeleton h-14" />
             ))}
           </div>
         ) : (exercises ?? []).length === 0 ? (
           <div className="text-center py-12 space-y-3">
             <p style={{ color: "var(--color-text-ghost)", fontSize: 14 }}>
-              No exercises match your filters.
+              Nothing in the index matches your filters.
             </p>
-            <button
-              onClick={clearAll}
-              className="text-sm font-medium"
-              style={{ color: "var(--color-amber)" }}
-            >
+            <button onClick={clearAll} className="bp-btn-outline px-3 py-1.5">
               Clear all filters
             </button>
           </div>
@@ -206,14 +205,18 @@ export function ExercisePicker({ onSelect, onClose }: Props) {
               <button
                 key={ex.id}
                 onClick={() => onSelect(ex)}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-[120ms] hover:bg-[var(--color-surface)]"
-                style={{ border: "1px solid var(--color-border)" }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-150 hover:bg-[var(--color-sheet-raised)]"
+                style={{
+                  backgroundColor: "var(--color-sheet)",
+                  border: "1px solid var(--color-line)",
+                  borderRadius: 2,
+                }}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate" style={{ color: "var(--color-text-primary)" }}>
+                  <p className="text-sm font-medium truncate" style={{ color: "var(--color-text-primary)" }}>
                     {ex.name}
                   </p>
-                  <p className="text-xs mt-0.5" style={{ color: "var(--color-amber)" }}>
+                  <p className="label-caps mt-0.5" style={{ fontSize: 11 }}>
                     {MUSCLE_GROUP_LABELS[ex.muscle_group as MuscleGroup] ?? ex.muscle_group}
                     {(ex.secondary_muscles as string[]).length > 0 &&
                       ` · ${(ex.secondary_muscles as string[])
@@ -222,12 +225,15 @@ export function ExercisePicker({ onSelect, onClose }: Props) {
                         .join(", ")}`}
                   </p>
                 </div>
-                {/* Equipment badge */}
                 <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded shrink-0"
+                  className="font-display shrink-0 px-2 py-0.5"
                   style={{
-                    backgroundColor: `${EQUIPMENT_COLOR[ex.equipment] ?? "#6B7280"}20`,
-                    color: EQUIPMENT_COLOR[ex.equipment] ?? "#6B7280",
+                    fontSize: 11,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "var(--color-text-secondary)",
+                    border: "1px solid var(--color-line)",
+                    borderRadius: 1,
                   }}
                 >
                   {EQUIPMENT_OPTIONS.find((e) => e.value === ex.equipment)?.label ?? ex.equipment}
