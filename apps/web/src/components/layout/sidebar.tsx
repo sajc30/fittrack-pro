@@ -2,127 +2,122 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Dumbbell,
-  TrendingUp,
-  Scale,
-  Library,
-  Settings,
-  Zap,
-} from "lucide-react";
+import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/dashboard",  label: "Dashboard",  icon: LayoutDashboard },
-  { href: "/workouts",   label: "Workouts",   icon: Dumbbell },
-  { href: "/progress",   label: "Progress",   icon: TrendingUp },
-  { href: "/body",       label: "Body",       icon: Scale },
-  { href: "/exercises",  label: "Exercises",  icon: Library },
+  { href: "/dashboard", sheet: "01", label: "Dashboard" },
+  { href: "/workouts",  sheet: "02", label: "Workouts" },
+  { href: "/progress",  sheet: "03", label: "Progress" },
+  { href: "/body",      sheet: "04", label: "Body" },
+  { href: "/exercises", sheet: "05", label: "Exercises" },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const year = new Date().getFullYear();
 
   return (
     <aside
-      className="flex flex-col w-56 shrink-0 h-full border-r"
-      style={{
-        backgroundColor: "var(--color-surface)",
-        borderColor: "var(--color-border)",
-      }}
+      className="flex flex-col w-60 shrink-0 h-full border-r"
+      style={{ backgroundColor: "var(--color-sheet)", borderColor: "var(--color-line)" }}
     >
-      {/* Logo */}
-      <div
-        className="flex items-center gap-2.5 px-5 py-5 border-b"
-        style={{ borderColor: "var(--color-border)" }}
-      >
-        <div
-          className="w-7 h-7 rounded flex items-center justify-center shrink-0"
-          style={{ backgroundColor: "var(--color-amber)" }}
+      {/* Title block */}
+      <div className="px-5 py-5 border-b" style={{ borderColor: "var(--color-line)" }}>
+        <p
+          className="font-display font-semibold"
+          style={{ color: "var(--color-text-primary)", fontSize: 15, letterSpacing: "0.22em" }}
         >
-          <Zap className="w-4 h-4" style={{ color: "var(--color-void)" }} />
-        </div>
-        <span
-          className="font-display font-bold text-lg tracking-tight"
-          style={{ color: "var(--color-text-primary)" }}
-        >
-          FitTrack
-        </span>
+          FITTRACK
+        </p>
+        <p className="label-caps mt-1" style={{ fontSize: 11 }}>
+          Personal training log
+        </p>
       </div>
 
-      {/* Start Workout CTA */}
-      <div className="px-3 pt-4 pb-2">
+      {/* Begin session */}
+      <div className="px-4 pt-4 pb-2">
         <Link
           href="/workouts/new"
-          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg font-semibold text-sm transition-all duration-[120ms]"
-          style={{
-            backgroundColor: "var(--color-amber)",
-            color: "var(--color-void)",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.backgroundColor =
-              "var(--color-amber-glow)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.backgroundColor =
-              "var(--color-amber)";
-          }}
+          className="bp-btn flex items-center justify-center gap-2 w-full py-2.5"
         >
-          <Dumbbell className="w-4 h-4" />
-          Start Workout
+          <Plus className="w-3.5 h-3.5" />
+          Begin session
         </Link>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-2 space-y-0.5">
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + "/");
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-[120ms] group",
-                active ? "" : "hover:bg-[var(--color-raised)]"
-              )}
-              style={{
-                backgroundColor: active ? "var(--color-amber-dim)" : undefined,
-                color: active
-                  ? "var(--color-amber)"
-                  : "var(--color-text-secondary)",
-              }}
-            >
-              <Icon
-                className="w-4 h-4 shrink-0"
+      {/* Sheet index */}
+      <nav className="flex-1 px-4 py-3">
+        <p className="label-caps mb-2 px-1">Sheet index</p>
+        <div className="space-y-px">
+          {navItems.map(({ href, sheet, label }) => {
+            const active = pathname === href || pathname.startsWith(href + "/");
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  "flex items-baseline gap-3 px-2.5 py-2 text-sm transition-all duration-150 border-l-2",
+                  active ? "hatch" : "hover:bg-[var(--color-sheet-raised)]"
+                )}
                 style={{
-                  color: active
-                    ? "var(--color-amber)"
-                    : "var(--color-text-ghost)",
+                  borderLeftColor: active ? "var(--color-paper)" : "transparent",
+                  color: active ? "var(--color-text-primary)" : "var(--color-text-secondary)",
                 }}
-              />
-              {label}
-            </Link>
-          );
-        })}
+              >
+                <span
+                  className="font-display shrink-0"
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: "0.1em",
+                    color: active ? "var(--color-paper)" : "var(--color-text-ghost)",
+                  }}
+                >
+                  {sheet}
+                </span>
+                <span className="font-medium">{label}</span>
+              </Link>
+            );
+          })}
+        </div>
       </nav>
 
-      {/* Settings */}
-      <div
-        className="px-3 pb-4 border-t pt-3"
-        style={{ borderColor: "var(--color-border)" }}
-      >
+      {/* Settings + title-block footer */}
+      <div className="px-4 pb-4 border-t pt-3" style={{ borderColor: "var(--color-line)" }}>
         <Link
           href="/settings"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-[120ms] hover:bg-[var(--color-raised)]"
-          style={{ color: "var(--color-text-secondary)" }}
+          className={cn(
+            "flex items-baseline gap-3 px-2.5 py-2 text-sm transition-all duration-150 border-l-2",
+            pathname.startsWith("/settings") ? "hatch" : "hover:bg-[var(--color-sheet-raised)]"
+          )}
+          style={{
+            borderLeftColor: pathname.startsWith("/settings") ? "var(--color-paper)" : "transparent",
+            color: pathname.startsWith("/settings")
+              ? "var(--color-text-primary)"
+              : "var(--color-text-secondary)",
+          }}
         >
-          <Settings
-            className="w-4 h-4 shrink-0"
-            style={{ color: "var(--color-text-ghost)" }}
-          />
-          Settings
+          <span
+            className="font-display shrink-0"
+            style={{
+              fontSize: 11,
+              letterSpacing: "0.1em",
+              color: pathname.startsWith("/settings")
+                ? "var(--color-paper)"
+                : "var(--color-text-ghost)",
+            }}
+          >
+            06
+          </span>
+          <span className="font-medium">Settings</span>
         </Link>
+        <div
+          className="mt-3 px-2.5 pt-2.5 border-t flex items-center justify-between"
+          style={{ borderColor: "var(--color-line)" }}
+        >
+          <span className="label-caps" style={{ fontSize: 11 }}>Scale 1:1</span>
+          <span className="label-caps" style={{ fontSize: 11 }}>{year}</span>
+        </div>
       </div>
     </aside>
   );

@@ -36,7 +36,7 @@ export function LoginForm() {
     backgroundColor: "var(--color-inset)",
     border: "1px solid var(--color-border)",
     color: "var(--color-text-primary)",
-    borderRadius: 8,
+    borderRadius: 2,
     padding: "10px 14px",
     fontSize: 14,
     width: "100%",
@@ -126,15 +126,11 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-[120ms] disabled:opacity-60"
-        style={{
-          backgroundColor: "var(--color-amber)",
-          color: "var(--color-void)",
-          marginTop: 8,
-        }}
+        className="bp-btn w-full py-2.5 flex items-center justify-center gap-2"
+        style={{ marginTop: 8 }}
       >
         {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-        {loading ? "Signing in…" : "Sign In"}
+        {loading ? "Signing in…" : "Sign in"}
       </button>
 
       <p

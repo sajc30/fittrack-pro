@@ -14,27 +14,33 @@ export function QuickStatsCard() {
   const totalCount = workouts?.length ?? 0;
 
   const stats = [
-    { label: "Last Workout",   value: latest ? formatRelativeDate(latest.started_at) : "—" },
-    { label: "This Month",     value: `${thisMonthCount} session${thisMonthCount !== 1 ? "s" : ""}` },
-    { label: "Total Workouts", value: totalCount > 0 ? String(totalCount) : "—" },
+    { label: "Last session",  value: latest ? formatRelativeDate(latest.started_at) : "—" },
+    { label: "This month",    value: `${thisMonthCount} session${thisMonthCount !== 1 ? "s" : ""}` },
+    { label: "Total logged",  value: totalCount > 0 ? String(totalCount) : "—" },
+    { label: "Next sheet",    value: `Session ${String(totalCount + 1).padStart(3, "0")}` },
   ];
 
   return (
-    <div
-      className="rounded-xl border p-5 h-full"
-      style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
-    >
-      <p className="label-caps mb-4">At a Glance</p>
+    <div className="sheet sheet-frame p-5 h-full">
+      <p className="fig-label mb-4">Title block — at a glance</p>
       {isLoading ? (
         <div className="space-y-3">
-          {[1,2,3].map(i => <div key={i} className="skeleton h-5 w-full" />)}
+          {[1, 2, 3].map(i => <div key={i} className="skeleton h-5 w-full" />)}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3.5">
           {stats.map((stat) => (
-            <div key={stat.label} className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>{stat.label}</span>
-              <span className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>{stat.value}</span>
+            <div key={stat.label} className="flex items-baseline">
+              <span className="label-caps shrink-0" style={{ fontSize: 11 }}>
+                {stat.label}
+              </span>
+              <span className="leader-dots" />
+              <span
+                className="font-display text-sm shrink-0"
+                style={{ color: "var(--color-text-primary)" }}
+              >
+                {stat.value}
+              </span>
             </div>
           ))}
         </div>

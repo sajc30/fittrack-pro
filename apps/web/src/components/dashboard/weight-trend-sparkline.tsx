@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LineChart, Line, ResponsiveContainer, Tooltip } from "recharts";
 import { useMeasurements } from "@/lib/hooks/use-measurements";
-import { format } from "date-fns";
 
 function kgToLbs(kg: number) { return Math.round(kg * 2.20462 * 10) / 10; }
+
+const W = 200;
+const H = 56;
+const PAD = 5;
 
 export function WeightTrendSparkline() {
   const { data: measurements, isLoading } = useMeasurements();
@@ -17,33 +19,46 @@ export function WeightTrendSparkline() {
 
   const convert = (kg: number) => weightUnit === "lbs" ? kgToLbs(kg) : kg;
 
-  const weightData = (measurements ?? [])
+  const weights = (measurements ?? [])
     .filter((m) => m.weight_kg !== null)
     .slice(0, 12)
     .reverse()
-    .map((m) => ({
-      date: format(new Date(m.measured_at), "MMM d"),
-      weight: convert(m.weight_kg as number),
-    }));
+    .map((m) => convert(m.weight_kg as number));
 
-  const latest = weightData.at(-1)?.weight ?? null;
-  const first  = weightData.at(0)?.weight ?? null;
+  const latest = weights.at(-1) ?? null;
+  const first  = weights.at(0) ?? null;
   const diff   = latest !== null && first !== null ? Math.round((latest - first) * 10) / 10 : null;
   const unit   = weightUnit === "lbs" ? "lbs" : "kg";
 
+  // Plot points across the viewBox; flat data sits on the centerline
+  const min = Math.min(...weights);
+  const max = Math.max(...weights);
+  const span = max - min;
+  const points = weights.map((w, i) => {
+    const x = weights.length === 1
+      ? W / 2
+      : PAD + (i / (weights.length - 1)) * (W - PAD * 2);
+    const y = span === 0
+      ? H / 2
+      : PAD + (1 - (w - min) / span) * (H - PAD * 2);
+    return [Math.round(x * 10) / 10, Math.round(y * 10) / 10] as const;
+  });
+  const last = points.at(-1);
+
   return (
-    <div
-      className="rounded-xl border p-5 h-full"
-      style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <p className="label-caps">Body Weight</p>
-        {diff !== null && (
+    <div className="sheet p-5 h-full">
+      <div className="flex items-center justify-between mb-4">
+        <p className="fig-label">Fig. 3 — Bodyweight</p>
+        {diff !== null && diff !== 0 && (
           <span
-            className="text-xs font-medium"
-            style={{ color: diff <= 0 ? "var(--color-green)" : "var(--color-red)" }}
+            className="font-display"
+            style={{
+              fontSize: 12,
+              letterSpacing: "0.08em",
+              color: diff < 0 ? "var(--color-green)" : "var(--color-text-secondary)",
+            }}
           >
-            {diff > 0 ? "+" : ""}{diff} {unit}
+            Δ {diff > 0 ? "+" : ""}{diff} {unit.toUpperCase()}
           </span>
         )}
       </div>
@@ -52,28 +67,52 @@ export function WeightTrendSparkline() {
         <div className="skeleton h-10 w-20 mb-2" />
       ) : latest === null ? (
         <p className="text-sm mt-2" style={{ color: "var(--color-text-ghost)" }}>
-          Log your weight in Body to see the trend.
+          Log your weight on Sht 04 — Body to plot the curve.
         </p>
       ) : (
         <>
           <div className="flex items-end gap-1.5 mb-3">
             <span className="stat-large" style={{ color: "var(--color-text-primary)" }}>{latest}</span>
-            <span className="text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>{unit}</span>
+            <span className="label-caps mb-1">{unit}</span>
           </div>
 
-          {weightData.length > 1 && (
-            <div className="h-12">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={weightData}>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "var(--color-raised)", border: "1px solid var(--color-border)", borderRadius: 8, fontSize: 12, color: "var(--color-text-primary)" }}
-                    formatter={(v) => [`${v} ${unit}`, ""]}
-                    labelStyle={{ color: "var(--color-text-secondary)" }}
-                  />
-                  <Line type="monotone" dataKey="weight" stroke="var(--color-amber)" strokeWidth={2} dot={false} activeDot={{ r: 4, fill: "var(--color-amber)", stroke: "none" }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+          {points.length > 1 && (
+            <svg
+              viewBox={`0 0 ${W} ${H}`}
+              className="w-full"
+              style={{ height: 52 }}
+              role="img"
+              aria-label={`Bodyweight trend, last ${points.length} entries`}
+            >
+              {[0.25, 0.5, 0.75].map((f) => (
+                <line
+                  key={f}
+                  x1="0" y1={H * f} x2={W} y2={H * f}
+                  stroke="var(--color-line)" strokeWidth="0.5"
+                />
+              ))}
+              <polyline
+                points={points.map(([x, y]) => `${x},${y}`).join(" ")}
+                fill="none"
+                stroke="var(--color-paper)"
+                strokeWidth="1.5"
+                pathLength={1}
+                className="bp-draw"
+              />
+              {points.slice(0, -1).map(([x, y], i) => (
+                <circle
+                  key={i}
+                  cx={x} cy={y} r="1.8"
+                  fill="var(--color-sheet)"
+                  stroke="var(--color-text-secondary)"
+                  strokeWidth="0.8"
+                  className="bp-fade-in"
+                />
+              ))}
+              {last && (
+                <circle cx={last[0]} cy={last[1]} r="2.5" fill="var(--color-paper)" className="bp-fade-in" />
+              )}
+            </svg>
           )}
         </>
       )}

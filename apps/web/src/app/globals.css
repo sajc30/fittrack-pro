@@ -1,42 +1,62 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BLUEPRINT — design system
+   The app is an engineering drawing of your training: ink-blue sheets,
+   hairline strokes, mono annotations, dimension lines, red revision markup.
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 @theme {
   /* ── Fonts ── */
-  --font-display: "Barlow Condensed", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+  --font-mono:    "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+  --font-sans:    "Inter", ui-sans-serif, system-ui, sans-serif;
 
-  /* ── Color palette ── */
-  --color-void:          #080809;
-  --color-surface:       #111114;
-  --color-raised:        #18181C;
-  --color-inset:         #050506;
-  --color-border:        #1E1E24;
-  --color-border-bright: #2A2A34;
+  /* ── Blueprint palette ── */
+  --color-ink:           #0A1320;  /* page — deep drafting-table blue-black */
+  --color-sheet:         #0D1726;  /* card surface */
+  --color-sheet-raised:  #13243A;  /* hover / raised surface */
+  --color-sheet-inset:   #071120;  /* inputs, wells */
+  --color-line:          #24405C;  /* hairline strokes & borders */
+  --color-line-bright:   #3E608A;  /* emphasized strokes */
+  --color-grid-line:     rgba(143, 180, 217, 0.05);
+  --color-grid-major:    rgba(143, 180, 217, 0.09);
 
-  --color-text-primary:   #EBEBED;
-  --color-text-secondary: #6B7280;
-  --color-text-ghost:     #3A3A46;
+  --color-text-primary:  #E6F1FA;
+  --color-text-secondary:#8FB4D9;  /* drafting blue — secondary text */
+  --color-text-ghost:    #54799E;  /* faint annotations */
 
-  --color-amber:     #F59E0B;
-  --color-amber-glow:#FCD34D;
-  --color-amber-dim: #78450A;
+  --color-paper:         #D8E8F5;  /* bright "paper" accent — CTAs, emphasis */
+  --color-paper-bright:  #F2F8FD;
+  --color-redline:       #E2574E;  /* revision markup — PRs, destructive */
+  --color-green:         #56B98A;
+  --color-blue:          #5C8FD6;
 
-  --color-green:  #16A34A;
-  --color-red:    #DC2626;
-  --color-blue:   #2563EB;
+  /* ── Legacy aliases — unmigrated pages inherit the blueprint palette
+        through these. Remove once every page uses the new token names. ── */
+  --color-void:          #0A1320;
+  --color-surface:       #0D1726;
+  --color-raised:        #13243A;
+  --color-inset:         #071120;
+  --color-border:        #24405C;
+  --color-border-bright: #3E608A;
+  --color-amber:         #D8E8F5;
+  --color-amber-glow:    #F2F8FD;
+  --color-amber-dim:     #1A3050;
+  --color-red:           #E2574E;
 
-  /* ── Radius ── */
-  --radius-sharp:  4px;
-  --radius-base:   8px;
-  --radius-soft:   12px;
-  --radius-pill:   9999px;
+  /* ── Radius — drafting tools draw sharp corners ── */
+  --radius-sharp: 2px;
+  --radius-base:  3px;
+  --radius-soft:  4px;
+  --radius-pill:  9999px;
 
   /* ── Motion ── */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* ── Base reset & dark-first foundation ── */
+/* ── Base ── */
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -49,119 +69,253 @@ html {
 }
 
 body {
-  background-color: var(--color-void);
+  background-color: var(--color-ink);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.5;
-  /* Subtle noise texture — the detail that separates flat from crafted */
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.02'/%3E%3C/svg%3E");
+  /* The drafting grid — fine lines every 24px, a brighter major line every 120px */
+  background-image:
+    linear-gradient(to right,  var(--color-grid-major) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-grid-major) 1px, transparent 1px),
+    linear-gradient(to right,  var(--color-grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-grid-line) 1px, transparent 1px);
+  background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
 }
 
-/* ── shadcn token override — map to our system ── */
+/* ── shadcn token map ── */
 :root {
-  --background: 0 0% 3%;
-  --foreground: 240 7% 93%;
-  --card: 240 5% 7%;
-  --card-foreground: 240 7% 93%;
-  --popover: 240 5% 7%;
-  --popover-foreground: 240 7% 93%;
-  --primary: 38 92% 50%;
-  --primary-foreground: 240 5% 7%;
-  --secondary: 240 4% 11%;
-  --secondary-foreground: 240 7% 93%;
-  --muted: 240 4% 11%;
-  --muted-foreground: 220 9% 46%;
-  --accent: 38 92% 50%;
-  --accent-foreground: 240 5% 7%;
-  --destructive: 0 72% 51%;
-  --destructive-foreground: 240 7% 93%;
-  --border: 240 5% 14%;
-  --input: 240 5% 14%;
-  --ring: 38 92% 50%;
-  --radius: 0.5rem;
+  --background: 213 52% 8%;
+  --foreground: 206 67% 94%;
+  --card: 214 49% 10%;
+  --card-foreground: 206 67% 94%;
+  --popover: 214 49% 10%;
+  --popover-foreground: 206 67% 94%;
+  --primary: 207 45% 90%;
+  --primary-foreground: 213 52% 8%;
+  --secondary: 215 51% 15%;
+  --secondary-foreground: 206 67% 94%;
+  --muted: 215 51% 15%;
+  --muted-foreground: 210 47% 71%;
+  --accent: 207 45% 90%;
+  --accent-foreground: 213 52% 8%;
+  --destructive: 3 72% 60%;
+  --destructive-foreground: 206 67% 94%;
+  --border: 211 44% 25%;
+  --input: 211 44% 25%;
+  --ring: 207 45% 90%;
+  --radius: 0.25rem;
 }
 
 /* ── Typography utilities ── */
 .font-display { font-family: var(--font-display); }
 .font-sans    { font-family: var(--font-sans); }
 
-/* Stat sizes — Barlow Condensed data display */
-.stat-hero  { font-family: var(--font-display); font-size: 72px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
-.stat-large { font-family: var(--font-display); font-size: 48px; font-weight: 700; letter-spacing: -0.01em; line-height: 1; }
-.stat-mid   { font-family: var(--font-display); font-size: 32px; font-weight: 600; letter-spacing: 0;       line-height: 1.1; }
-.stat-small { font-family: var(--font-display); font-size: 20px; font-weight: 500; letter-spacing: 0;       line-height: 1.2; }
+/* Stat sizes — mono data display, like dimension callouts */
+.stat-hero  { font-family: var(--font-mono); font-size: 56px; font-weight: 600; line-height: 1; }
+.stat-large { font-family: var(--font-mono); font-size: 40px; font-weight: 600; line-height: 1; }
+.stat-mid   { font-family: var(--font-mono); font-size: 28px; font-weight: 500; line-height: 1.1; }
+.stat-small { font-family: var(--font-mono); font-size: 18px; font-weight: 500; line-height: 1.2; }
 
-/* UI label uppercase style */
+/* Annotation label — uppercase mono, like text on a drawing */
 .label-caps {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-ghost);
+}
+
+/* Figure caption — "FIG. 1 — WEEKLY VOLUME" */
+.fig-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--color-text-secondary);
 }
 
-/* ── Focus ring — amber, precise ── */
+/* ── Sheet — a card drawn on the drafting table ── */
+.sheet {
+  position: relative;
+  background-color: var(--color-sheet);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sharp);
+  transition: border-color 160ms var(--ease-out-expo);
+}
+.sheet:hover { border-color: var(--color-line-bright); }
+/* Registration mark surfaces when you "pick up" the sheet */
+.sheet::after {
+  content: "+";
+  position: absolute;
+  top: 3px;
+  right: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1;
+  color: var(--color-text-ghost);
+  opacity: 0;
+  transition: opacity 200ms;
+  pointer-events: none;
+}
+.sheet:hover::after { opacity: 1; }
+
+/* Inner hairline frame for hero sheets — the double rule of a drawing border */
+.sheet-frame::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 55%, transparent);
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+/* ── Hatching — section fill for "solid" areas ── */
+.hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 4px,
+    rgba(143, 180, 217, 0.28) 4px 5px
+  );
+}
+.hatch-bright {
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 4px,
+    rgba(216, 232, 245, 0.55) 4px 5px
+  );
+}
+
+/* ── Buttons — drafting stamps ── */
+.bp-btn {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  border: 1px solid var(--color-paper);
+  border-radius: var(--radius-sharp);
+  transition: all 140ms var(--ease-out-expo);
+}
+.bp-btn:hover:not(:disabled) { background-color: var(--color-paper-bright); }
+.bp-btn:disabled { opacity: 0.5; }
+
+.bp-btn-outline {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sharp);
+  transition: all 140ms var(--ease-out-expo);
+}
+.bp-btn-outline:hover:not(:disabled) {
+  border-color: var(--color-line-bright);
+  color: var(--color-text-primary);
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 4px,
+    rgba(143, 180, 217, 0.12) 4px 5px
+  );
+}
+
+/* ── Red revision markup — how engineers mark what changed ── */
+.stamp {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-redline);
+  border: 1px solid var(--color-redline);
+  border-radius: 1px;
+  padding: 2px 7px;
+  transform: rotate(-3deg);
+}
+
+/* Dotted leader — connects a label to its value, title-block style */
+.leader-dots {
+  flex: 1;
+  border-bottom: 1px dotted var(--color-line-bright);
+  margin: 0 10px;
+  transform: translateY(-4px);
+}
+
+/* ── Chart strokes draft themselves in (pair with pathLength={1}) ── */
+@keyframes bp-draw {
+  from { stroke-dashoffset: 1; }
+  to   { stroke-dashoffset: 0; }
+}
+.bp-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: bp-draw 1.1s var(--ease-out-expo) 150ms forwards;
+}
+
+@keyframes bp-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.bp-fade-in { opacity: 0; animation: bp-fade-in 400ms ease 900ms forwards; }
+
+/* ── Focus ring ── */
 :focus-visible {
-  outline: 1px solid var(--color-amber);
+  outline: 1px solid var(--color-paper);
   outline-offset: 2px;
 }
 
-/* ── Scrollbar — dark and minimal ── */
+/* ── Scrollbar ── */
 ::-webkit-scrollbar       { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-border-bright); border-radius: var(--radius-pill); }
-::-webkit-scrollbar-thumb:hover { background: var(--color-text-ghost); }
+::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: var(--radius-pill); }
+::-webkit-scrollbar-thumb:hover { background: var(--color-line-bright); }
 
-/* ── Selection color ── */
-::selection { background: var(--color-amber-dim); color: var(--color-amber-glow); }
+/* ── Selection ── */
+::selection { background: #1A3050; color: var(--color-paper-bright); }
 
 /* ── Skeleton shimmer ── */
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
 }
-
 .skeleton {
   background: linear-gradient(
     90deg,
-    var(--color-surface) 25%,
-    var(--color-raised) 50%,
-    var(--color-surface) 75%
+    var(--color-sheet) 25%,
+    var(--color-sheet-raised) 50%,
+    var(--color-sheet) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s ease infinite;
-  border-radius: var(--radius-base);
+  border-radius: var(--radius-sharp);
 }
 
-/* ── PR pulse animation ── */
+/* ── PR pulse ── */
 @keyframes pr-pulse {
   0%   { opacity: 0.15; transform: scale(0); }
   50%  { opacity: 0.08; }
   100% { opacity: 0;    transform: scale(2); }
 }
+.pr-pulse { animation: pr-pulse 0.4s var(--ease-out-expo) forwards; }
 
-.pr-pulse {
-  animation: pr-pulse 0.4s var(--ease-out-expo) forwards;
-}
-
-/* ── Page transition fade ── */
+/* ── Page transition ── */
 @keyframes fade-in {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+.page-enter { animation: fade-in 0.2s var(--ease-out-expo) both; }
 
-.page-enter {
-  animation: fade-in 0.2s var(--ease-out-expo) both;
-}
-
-/* ── Rest timer progress ── */
+/* ── Rest timer glow ── */
 @keyframes rest-timer-glow {
-  0%, 100% { box-shadow: 0 0 4px 0 rgba(245,158,11,0.3); }
-  50%       { box-shadow: 0 0 8px 2px rgba(245,158,11,0.6); }
+  0%, 100% { box-shadow: 0 0 4px 0 rgba(216, 232, 245, 0.3); }
+  50%      { box-shadow: 0 0 8px 2px rgba(216, 232, 245, 0.6); }
 }
-
-.rest-timer-active {
-  animation: rest-timer-glow 2s ease-in-out infinite;
-}
+.rest-timer-active { animation: rest-timer-glow 2s ease-in-out infinite; }

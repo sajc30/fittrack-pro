@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 const MONTHS = [
@@ -8,8 +9,8 @@ const MONTHS = [
 ];
 
 function daysInMonth(month: number, year: number) {
-  if (!month || !year) return 31;
-  return new Date(year, month, 0).getDate();
+  if (!month) return 31;
+  return new Date(year || 2000, month, 0).getDate();
 }
 
 interface Props {
@@ -18,31 +19,63 @@ interface Props {
 }
 
 export function DobPicker({ value, onChange }: Props) {
-  const parts = value ? value.split("-") : ["", "", ""];
-  const selectedYear  = parts[0] ? parseInt(parts[0]) : 0;
-  const selectedMonth = parts[1] ? parseInt(parts[1]) : 0;
-  const selectedDay   = parts[2] ? parseInt(parts[2]) : 0;
+  // Partial selections live here — the value prop only ever carries a complete
+  // date, so building one dropdown at a time must not reset the others.
+  const [year, setYear] = useState(0);
+  const [month, setMonth] = useState(0);
+  const [day, setDay] = useState(0);
+
+  // Sync down when the parent supplies a complete date (e.g. profile loads in settings)
+  useEffect(() => {
+    if (!value) return;
+    const [y, m, d] = value.split("-").map(Number);
+    if (y && m && d) {
+      setYear(y);
+      setMonth(m);
+      setDay(d);
+    }
+  }, [value]);
 
   const currentYear = new Date().getFullYear();
   const years: number[] = [];
   for (let y = currentYear - 10; y >= 1935; y--) years.push(y);
 
-  const maxDays = daysInMonth(selectedMonth, selectedYear);
+  const maxDays = daysInMonth(month, year);
   const days: number[] = [];
   for (let d = 1; d <= maxDays; d++) days.push(d);
 
   function emit(y: number, m: number, d: number) {
-    if (!y || !m || !d) { onChange(""); return; }
-    const mm = String(m).padStart(2, "0");
-    const dd = String(d).padStart(2, "0");
-    onChange(`${y}-${mm}-${dd}`);
+    if (y && m && d) {
+      onChange(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+    } else {
+      onChange("");
+    }
+  }
+
+  function handleMonth(m: number) {
+    const clampedDay = day > daysInMonth(m, year) ? daysInMonth(m, year) : day;
+    setMonth(m);
+    setDay(clampedDay);
+    emit(year, m, clampedDay);
+  }
+
+  function handleDay(d: number) {
+    setDay(d);
+    emit(year, month, d);
+  }
+
+  function handleYear(y: number) {
+    const clampedDay = day > daysInMonth(month, y) ? daysInMonth(month, y) : day;
+    setYear(y);
+    setDay(clampedDay);
+    emit(y, month, clampedDay);
   }
 
   const selectStyle = {
     backgroundColor: "var(--color-inset)",
     border: "1px solid var(--color-border)",
     color: "var(--color-text-primary)",
-    borderRadius: 8,
+    borderRadius: 2,
     padding: "10px 32px 10px 12px",
     fontSize: 14,
     outline: "none",
@@ -57,12 +90,8 @@ export function DobPicker({ value, onChange }: Props) {
       {/* Month */}
       <div className="relative">
         <select
-          value={selectedMonth}
-          onChange={(e) => {
-            const m = parseInt(e.target.value);
-            const clamped = Math.min(selectedDay, daysInMonth(m, selectedYear) || 31);
-            emit(selectedYear, m, clamped);
-          }}
+          value={month}
+          onChange={(e) => handleMonth(parseInt(e.target.value))}
           style={selectStyle}
           onFocus={(e) => (e.target.style.borderColor = "var(--color-amber)")}
           onBlur={(e) => (e.target.style.borderColor = "var(--color-border)")}
@@ -78,8 +107,8 @@ export function DobPicker({ value, onChange }: Props) {
       {/* Day */}
       <div className="relative">
         <select
-          value={selectedDay}
-          onChange={(e) => emit(selectedYear, selectedMonth, parseInt(e.target.value))}
+          value={day}
+          onChange={(e) => handleDay(parseInt(e.target.value))}
           style={selectStyle}
           onFocus={(e) => (e.target.style.borderColor = "var(--color-amber)")}
           onBlur={(e) => (e.target.style.borderColor = "var(--color-border)")}
@@ -95,8 +124,8 @@ export function DobPicker({ value, onChange }: Props) {
       {/* Year */}
       <div className="relative">
         <select
-          value={selectedYear}
-          onChange={(e) => emit(parseInt(e.target.value), selectedMonth, selectedDay)}
+          value={year}
+          onChange={(e) => handleYear(parseInt(e.target.value))}
           style={selectStyle}
           onFocus={(e) => (e.target.style.borderColor = "var(--color-amber)")}
           onBlur={(e) => (e.target.style.borderColor = "var(--color-border)")}

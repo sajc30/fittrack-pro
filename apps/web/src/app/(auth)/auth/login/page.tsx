@@ -1,49 +1,33 @@
 import { Metadata } from "next";
 import { LoginForm } from "@/components/auth/login-form";
-import { Zap } from "lucide-react";
 
 export const metadata: Metadata = { title: "Sign In" };
 
 export default function LoginPage() {
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center px-4"
-      style={{ backgroundColor: "var(--color-void)" }}
-    >
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 mb-10">
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center"
-          style={{ backgroundColor: "var(--color-amber)" }}
+    <div className="min-h-screen flex flex-col items-center justify-center px-4">
+      {/* Cover-sheet wordmark */}
+      <div className="text-center mb-10">
+        <p
+          className="font-display font-semibold"
+          style={{
+            color: "var(--color-text-primary)",
+            fontSize: 22,
+            letterSpacing: "0.28em",
+          }}
         >
-          <Zap className="w-4.5 h-4.5" style={{ color: "var(--color-void)" }} />
-        </div>
-        <span
-          className="font-display font-bold text-xl tracking-tight"
-          style={{ color: "var(--color-text-primary)" }}
-        >
-          FitTrack Pro
-        </span>
+          FITTRACK
+        </p>
+        <p className="label-caps mt-1.5">Personal training log</p>
       </div>
 
-      <div
-        className="w-full max-w-sm rounded-2xl border p-8"
-        style={{
-          backgroundColor: "var(--color-surface)",
-          borderColor: "var(--color-border)",
-        }}
-      >
-        <h1
-          className="text-xl font-semibold mb-1"
-          style={{ color: "var(--color-text-primary)" }}
-        >
-          Welcome back
-        </h1>
+      <div className="sheet sheet-frame w-full max-w-sm p-8">
+        <p className="fig-label mb-1.5">Access — sign in</p>
         <p
           className="text-sm mb-6"
           style={{ color: "var(--color-text-secondary)" }}
         >
-          Sign in to your account to continue
+          Enter your credentials to open the drawing set.
         </p>
         <LoginForm />
       </div>

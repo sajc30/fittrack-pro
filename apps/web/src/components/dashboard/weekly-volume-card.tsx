@@ -1,54 +1,78 @@
 "use client";
 
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useWeeklyVolume } from "@/lib/hooks/use-workouts";
+
+/** Animate a number from 0 to its target, like a dial settling on a measurement. */
+function useCountUp(target: number, durationMs = 900): number {
+  const [value, setValue] = useState(0);
+  const raf = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (target === 0) { setValue(0); return; }
+    const start = performance.now();
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / durationMs);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setValue(target * eased);
+      if (p < 1) raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+    return () => { if (raf.current) cancelAnimationFrame(raf.current); };
+  }, [target, durationMs]);
+
+  return value;
+}
 
 export function WeeklyVolumeCard() {
   const { data, isLoading } = useWeeklyVolume();
   const thisWeek = data?.thisWeek ?? 0;
+  const lastWeek = data?.lastWeek ?? 0;
   const pct = data?.pct ?? 0;
   const isUp = pct > 0;
   const isSame = pct === 0;
+  const noBaseline = lastWeek === 0;
+  const animated = useCountUp(thisWeek);
 
   return (
-    <div
-      className="rounded-xl border p-5 h-full"
-      style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
-    >
-      <div className="flex items-center justify-between mb-4">
-        <p className="label-caps">Weekly Volume</p>
-        {isUp ? (
-          <TrendingUp className="w-4 h-4" style={{ color: "var(--color-green)" }} />
-        ) : isSame ? (
-          <Minus className="w-4 h-4" style={{ color: "var(--color-text-ghost)" }} />
-        ) : (
-          <TrendingDown className="w-4 h-4" style={{ color: "var(--color-red)" }} />
-        )}
-      </div>
+    <div className="sheet p-5 h-full">
+      <p className="fig-label mb-4">Fig. 2 — Weekly volume</p>
 
       {isLoading ? (
         <div className="skeleton h-10 w-24 mb-2" />
       ) : thisWeek === 0 ? (
         <p className="text-sm mt-1" style={{ color: "var(--color-text-ghost)" }}>
-          No sessions yet this week
+          No sets on record this week.
         </p>
       ) : (
         <>
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-2 mb-4">
             <span className="stat-large" style={{ color: "var(--color-text-primary)" }}>
-              {(thisWeek / 1000).toFixed(1)}
+              {(animated / 1000).toFixed(1)}
             </span>
-            <span className="text-sm font-medium mb-1" style={{ color: "var(--color-text-secondary)" }}>
-              tonnes
-            </span>
+            <span className="label-caps mb-1">tonnes</span>
           </div>
+
           <p
-            className="text-xs mt-2"
+            className="font-display"
             style={{
-              color: isUp ? "var(--color-green)" : isSame ? "var(--color-text-ghost)" : "var(--color-red)",
+              fontSize: 12,
+              letterSpacing: "0.08em",
+              color: noBaseline || isSame
+                ? "var(--color-text-ghost)"
+                : isUp
+                  ? "var(--color-green)"
+                  : "var(--color-redline)",
             }}
           >
-            {isSame ? "Same as last week" : `${isUp ? "+" : ""}${pct}% vs last week`}
+            {noBaseline
+              ? "FIRST WEEK ON RECORD"
+              : isSame
+                ? "Δ ±0% VS LAST WK"
+                : `Δ ${isUp ? "+" : ""}${pct}% VS LAST WK`}
+          </p>
+          <p className="label-caps mt-1" style={{ fontSize: 11 }}>
+            Reps × load, all sets
           </p>
         </>
       )}
