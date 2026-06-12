@@ -1,218 +1,182 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
-  LineChart, Line, BarChart, Bar,
-  XAxis, YAxis, Tooltip, ResponsiveContainer,
-  ReferenceLine, Area, AreaChart,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
 } from "recharts";
+import { useLoggedExercises, useStrengthHistory } from "@/lib/hooks/use-exercises";
+import { useWeeklyVolume, useWorkouts } from "@/lib/hooks/use-workouts";
 import { estimateOneRepMax } from "@fittrack/shared";
+import { format, subWeeks, startOfWeek, endOfWeek } from "date-fns";
+import { ChevronDown } from "lucide-react";
 
-type Range = "1M" | "3M" | "6M" | "1Y" | "ALL";
-
-const strengthData = [
-  { date: "Jan 8",  weight: 115, reps: 5 },
-  { date: "Jan 15", weight: 117.5, reps: 5 },
-  { date: "Jan 22", weight: 120, reps: 5 },
-  { date: "Feb 5",  weight: 122.5, reps: 4 },
-  { date: "Feb 12", weight: 120, reps: 5 },
-  { date: "Feb 19", weight: 125, reps: 4 },
-  { date: "Mar 1",  weight: 127.5, reps: 4 },
-  { date: "Mar 8",  weight: 125, reps: 5 },
-  { date: "Mar 15", weight: 130, reps: 3 },
-  { date: "Mar 22", weight: 132.5, reps: 3 },
-  { date: "Apr 1",  weight: 135, reps: 3 },
-].map((d) => ({
-  ...d,
-  e1rm: estimateOneRepMax(d.weight, d.reps),
-}));
-
-const volumeData = [
-  { week: "Mar 3",  volume: 11200 },
-  { week: "Mar 10", volume: 12800 },
-  { week: "Mar 17", volume: 11600 },
-  { week: "Mar 24", volume: 14200 },
-  { week: "Mar 31", volume: 13800 },
-  { week: "Apr 7",  volume: 14820 },
-];
-
-const RANGES: Range[] = ["1M", "3M", "6M", "1Y", "ALL"];
-
-const customTooltipStyle = {
-  backgroundColor: "var(--color-raised)",
-  border: "1px solid var(--color-border)",
-  borderRadius: 8,
-  fontSize: 12,
-  color: "var(--color-text-primary)",
-  padding: "8px 12px",
+const CHART_STYLE = {
+  backgroundColor: "var(--color-surface)",
+  borderColor: "var(--color-border)",
 };
 
 export function ProgressCharts() {
-  const [activeRange, setActiveRange] = useState<Range>("3M");
-  const [selectedExercise, setSelectedExercise] = useState("Bench Press");
+  const [selectedExerciseId, setSelectedExerciseId] = useState<string>("");
+  const [range, setRange] = useState<"3m" | "6m" | "1y" | "all">("3m");
 
-  const exercises = ["Bench Press", "Squat", "Deadlift", "Overhead Press"];
+  const { data: exercises } = useLoggedExercises();
+  const { data: strengthData, isLoading: strengthLoading } = useStrengthHistory(selectedExerciseId || null);
+  const { data: workouts } = useWorkouts(200);
+
+  // Set default exercise once exercises load
+  useMemo(() => {
+    if (exercises && exercises.length > 0 && !selectedExerciseId) {
+      setSelectedExerciseId(exercises[0].id);
+    }
+  }, [exercises, selectedExerciseId]);
+
+  // Build strength / e1RM line chart data
+  const rangeDate = useMemo(() => {
+    const now = new Date();
+    if (range === "3m") return subWeeks(now, 12);
+    if (range === "6m") return subWeeks(now, 26);
+    if (range === "1y") return subWeeks(now, 52);
+    return new Date(0);
+  }, [range]);
+
+  const e1rmData = useMemo(() => {
+    if (!strengthData) return [];
+    return strengthData
+      .filter((s) => new Date(s.logged_at) >= rangeDate)
+      .filter((s) => s.weight_kg !== null && s.reps !== null)
+      .map((s) => ({
+        date: format(new Date(s.logged_at), "MMM d"),
+        e1rm: Math.round(estimateOneRepMax(s.weight_kg!, s.reps!) * 10) / 10,
+        weight: s.weight_kg,
+        reps: s.reps,
+      }));
+  }, [strengthData, rangeDate]);
+
+  // Weekly volume bar chart
+  const volumeData = useMemo(() => {
+    if (!workouts) return [];
+    const weeks: { week: string; volume: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const weekStart = startOfWeek(subWeeks(new Date(), i));
+      const weekEnd = endOfWeek(weekStart);
+      const weekWorkouts = workouts.filter((w) => {
+        const d = new Date(w.started_at);
+        return d >= weekStart && d <= weekEnd;
+      });
+      const volume = weekWorkouts.reduce((sum, w) => {
+        const sets = (w.workout_sets as any[]) ?? [];
+        return sum + sets.reduce((s: number, set: any) => s + (set.reps ?? 0) * (set.weight_kg ?? 0), 0);
+      }, 0);
+      weeks.push({ week: format(weekStart, "MMM d"), volume: Math.round(volume / 100) / 10 });
+    }
+    return weeks;
+  }, [workouts]);
 
   return (
-    <div className="space-y-6">
-      {/* Strength chart */}
-      <div
-        className="rounded-xl border p-6"
-        style={{
-          backgroundColor: "var(--color-surface)",
-          borderColor: "var(--color-border)",
-        }}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <p className="label-caps mb-1.5">Strength Progress</p>
-            <div className="flex gap-2 flex-wrap">
-              {exercises.map((ex) => (
+    <div className="space-y-8">
+      {/* Strength progress */}
+      <div className="rounded-xl border p-6" style={CHART_STYLE}>
+        <div className="flex flex-col gap-3 mb-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="label-caps mb-1">Strength Progress</p>
+              <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Estimated 1-Rep Max over time</p>
+            </div>
+            {/* Range buttons */}
+            <div className="flex gap-1 shrink-0">
+              {(["3m","6m","1y","all"] as const).map((r) => (
                 <button
-                  key={ex}
-                  onClick={() => setSelectedExercise(ex)}
-                  className="px-3 py-1 rounded-md text-xs font-medium transition-all duration-[120ms]"
+                  key={r}
+                  onClick={() => setRange(r)}
+                  className="px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-[120ms]"
                   style={{
-                    backgroundColor:
-                      selectedExercise === ex
-                        ? "var(--color-amber)"
-                        : "var(--color-inset)",
-                    color:
-                      selectedExercise === ex
-                        ? "var(--color-void)"
-                        : "var(--color-text-secondary)",
-                    border: selectedExercise === ex
-                      ? "none"
-                      : "1px solid var(--color-border)",
+                    backgroundColor: range === r ? "var(--color-amber)" : "var(--color-inset)",
+                    color: range === r ? "var(--color-void)" : "var(--color-text-secondary)",
                   }}
                 >
-                  {ex}
+                  {r}
                 </button>
               ))}
             </div>
           </div>
-
-          {/* Range selector */}
-          <div className="flex gap-1">
-            {RANGES.map((r) => (
-              <button
-                key={r}
-                onClick={() => setActiveRange(r)}
-                className="px-2.5 py-1 rounded text-xs font-medium transition-all duration-[120ms]"
-                style={{
-                  color:
-                    activeRange === r
-                      ? "var(--color-amber)"
-                      : "var(--color-text-ghost)",
-                  backgroundColor: activeRange === r ? "var(--color-amber-dim)" : "transparent",
-                }}
+          {/* Exercise selector — only shows exercises the user has actually logged */}
+          {exercises && exercises.length > 0 ? (
+            <div className="relative w-full">
+              <select
+                value={selectedExerciseId}
+                onChange={(e) => setSelectedExerciseId(e.target.value)}
+                className="appearance-none w-full pl-3 pr-8 py-2 rounded-lg text-sm font-semibold"
+                style={{ backgroundColor: "var(--color-inset)", border: "1px solid var(--color-border)", color: "var(--color-text-primary)", outline: "none" }}
               >
-                {r}
-              </button>
-            ))}
+                {exercises.map((ex) => (
+                  <option key={ex.id} value={ex.id}>{ex.name}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "var(--color-text-ghost)" }} />
+            </div>
+          ) : (
+            <p className="text-sm" style={{ color: "var(--color-text-ghost)" }}>
+              No exercises logged yet — start a workout to see your progress here.
+            </p>
+          )}
+        </div>
+
+        {strengthLoading ? (
+          <div className="skeleton h-48 rounded-xl" />
+        ) : e1rmData.length < 2 ? (
+          <div className="h-48 flex items-center justify-center">
+            <p style={{ color: "var(--color-text-ghost)", fontSize: 14 }}>
+              Log at least 2 sessions of this exercise to see the trend.
+            </p>
           </div>
-        </div>
-
-        {/* Current E1RM callout */}
-        <div className="mb-4">
-          <span className="stat-large" style={{ color: "var(--color-amber)" }}>
-            {strengthData[strengthData.length - 1].e1rm}
-          </span>
-          <span
-            className="text-sm font-medium ml-2"
-            style={{ color: "var(--color-text-secondary)" }}
-          >
-            kg estimated 1RM
-          </span>
-        </div>
-
-        <div className="h-52">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={strengthData} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
-              <XAxis
-                dataKey="date"
-                tick={{ fill: "var(--color-text-ghost)", fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fill: "var(--color-text-ghost)", fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                width={36}
-                tickFormatter={(v) => `${v}`}
-              />
+        ) : (
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={e1rmData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: "var(--color-text-ghost)" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: "var(--color-text-ghost)" }} axisLine={false} tickLine={false} />
               <Tooltip
-                contentStyle={customTooltipStyle}
-                formatter={(value, name) => [
-                  `${value} kg`,
-                  name === "e1rm" ? "Est. 1RM" : "Weight",
-                ]}
-                labelStyle={{ color: "var(--color-text-secondary)", marginBottom: 4 }}
+                contentStyle={{ backgroundColor: "var(--color-raised)", border: "1px solid var(--color-border)", borderRadius: 8, fontSize: 12 }}
+                formatter={(v) => [`${v} kg`, "Est. 1RM"]}
               />
-              <Line
-                type="monotone"
-                dataKey="e1rm"
-                stroke="var(--color-amber)"
-                strokeWidth={2.5}
-                dot={false}
-                activeDot={{ r: 5, fill: "var(--color-amber)", stroke: "var(--color-void)", strokeWidth: 2 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="weight"
-                stroke="var(--color-text-ghost)"
-                strokeWidth={1.5}
-                strokeDasharray="4 4"
-                dot={false}
-              />
+              <Line type="monotone" dataKey="e1rm" stroke="var(--color-amber)" strokeWidth={2} dot={{ r: 3, fill: "var(--color-amber)", stroke: "none" }} activeDot={{ r: 5 }} />
             </LineChart>
           </ResponsiveContainer>
-        </div>
+        )}
       </div>
 
-      {/* Volume chart */}
-      <div
-        className="rounded-xl border p-6"
-        style={{
-          backgroundColor: "var(--color-surface)",
-          borderColor: "var(--color-border)",
-        }}
-      >
-        <p className="label-caps mb-6">Weekly Volume</p>
-
-        <div className="h-40">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={volumeData} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
-              <XAxis
-                dataKey="week"
-                tick={{ fill: "var(--color-text-ghost)", fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fill: "var(--color-text-ghost)", fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                width={48}
-                tickFormatter={(v) => `${(v / 1000).toFixed(0)}t`}
-              />
+      {/* Weekly volume */}
+      <div className="rounded-xl border p-6" style={CHART_STYLE}>
+        <div className="mb-5">
+          <p className="label-caps mb-1">Weekly Volume</p>
+          <p className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Total tonnage lifted per week (tonnes)</p>
+        </div>
+        {volumeData.every((d) => d.volume === 0) ? (
+          <div className="h-48 flex items-center justify-center">
+            <p style={{ color: "var(--color-text-ghost)", fontSize: 14 }}>No workout data yet.</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={volumeData} barCategoryGap="30%">
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+              <XAxis dataKey="week" tick={{ fontSize: 11, fill: "var(--color-text-ghost)" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: "var(--color-text-ghost)" }} axisLine={false} tickLine={false} />
               <Tooltip
-                contentStyle={customTooltipStyle}
-                formatter={(v) => [`${(Number(v) / 1000).toFixed(1)} tonnes`, "Volume"]}
-                labelStyle={{ color: "var(--color-text-secondary)" }}
-                cursor={{ fill: "var(--color-raised)" }}
+                contentStyle={{ backgroundColor: "var(--color-raised)", border: "1px solid var(--color-border)", borderRadius: 8, fontSize: 12 }}
+                formatter={(v) => [`${v}t`, "Volume"]}
               />
-              <Bar
-                dataKey="volume"
-                fill="var(--color-amber)"
-                radius={[4, 4, 0, 0]}
-                opacity={0.85}
-              />
+              <Bar dataKey="volume" fill="var(--color-amber)" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        )}
       </div>
     </div>
   );

@@ -2,21 +2,17 @@
 
 import { Trophy } from "lucide-react";
 import Link from "next/link";
-
-const mockPRs = [
-  { exercise: "Barbell Back Squat", weight: 140, reps: 5, date: "2 days ago" },
-  { exercise: "Bench Press",        weight: 100, reps: 3, date: "4 days ago" },
-  { exercise: "Deadlift",           weight: 180, reps: 1, date: "1 week ago" },
-];
+import { usePRs } from "@/lib/hooks/use-prs";
+import { formatRelativeDate } from "@fittrack/shared";
 
 export function RecentPRsCard() {
+  const { data: prs, isLoading } = usePRs();
+  const recent = (prs ?? []).slice(0, 4);
+
   return (
     <div
       className="rounded-xl border p-5 h-full"
-      style={{
-        backgroundColor: "var(--color-surface)",
-        borderColor: "var(--color-border)",
-      }}
+      style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
     >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -25,57 +21,45 @@ export function RecentPRsCard() {
         </div>
         <Link
           href="/progress"
-          className="text-xs font-medium transition-colors duration-[120ms]"
+          className="text-xs font-medium transition-colors duration-[120ms] hover:text-amber-400"
           style={{ color: "var(--color-text-ghost)" }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.color = "var(--color-amber)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.color = "var(--color-text-ghost)";
-          }}
         >
           View all →
         </Link>
       </div>
 
-      {mockPRs.length === 0 ? (
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1,2,3].map(i => <div key={i} className="skeleton h-10 w-full" />)}
+        </div>
+      ) : recent.length === 0 ? (
         <div className="py-8 text-center">
           <p style={{ color: "var(--color-text-ghost)", fontSize: 14 }}>
-            Log 3 sessions of the same exercise to set your first PR.
+            Complete 3 sessions of any exercise to set your first PR.
           </p>
         </div>
       ) : (
         <div className="space-y-1">
-          {mockPRs.map((pr, i) => (
+          {recent.map((pr, i) => (
             <div
               key={i}
               className="flex items-center justify-between py-2.5 rounded-lg px-3 transition-colors duration-[120ms] hover:bg-[var(--color-raised)] cursor-pointer"
             >
               <div>
-                <p
-                  className="text-sm font-medium"
-                  style={{ color: "var(--color-text-primary)" }}
-                >
-                  {pr.exercise}
+                <p className="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>
+                  {(pr.exercises as { name: string } | null)?.name ?? "Exercise"}
                 </p>
                 <p className="text-xs mt-0.5" style={{ color: "var(--color-text-ghost)" }}>
-                  {pr.date}
+                  {formatRelativeDate(pr.achieved_at)}
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <span
-                  className="stat-small"
-                  style={{ color: "var(--color-text-primary)" }}
-                >
-                  {pr.weight} kg
+                <span className="stat-small" style={{ color: "var(--color-text-primary)" }}>
+                  {pr.weight_kg} kg × {pr.reps}
                 </span>
                 <span
-                  className="px-2 py-0.5 rounded text-xs font-bold tracking-widest uppercase"
-                  style={{
-                    backgroundColor: "var(--color-amber-dim)",
-                    color: "var(--color-amber)",
-                    fontSize: 10,
-                  }}
+                  className="px-2 py-0.5 rounded font-bold tracking-widest uppercase"
+                  style={{ backgroundColor: "var(--color-amber-dim)", color: "var(--color-amber)", fontSize: 10 }}
                 >
                   PR
                 </span>

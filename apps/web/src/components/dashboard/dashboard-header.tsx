@@ -1,6 +1,6 @@
 "use client";
 
-import { formatRelativeDate } from "@fittrack/shared";
+import { useProfile } from "@/lib/hooks/use-profile";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -10,6 +10,9 @@ function getGreeting(): string {
 }
 
 export function DashboardHeader() {
+  const { data: profile } = useProfile();
+  const firstName = profile?.name?.split(" ")[0];
+
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -23,7 +26,7 @@ export function DashboardHeader() {
         className="text-2xl font-semibold tracking-tight"
         style={{ color: "var(--color-text-primary)" }}
       >
-        {getGreeting()}
+        {getGreeting()}{firstName ? `, ${firstName}` : ""}
       </h1>
     </div>
   );

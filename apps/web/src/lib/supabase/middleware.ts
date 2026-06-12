@@ -25,24 +25,45 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith("/auth");
-  const isPublicRoute =
-    request.nextUrl.pathname === "/" || isAuthRoute;
+  const path = request.nextUrl.pathname;
+  const isAuthRoute      = path.startsWith("/auth");
+  const isSignOut        = path === "/auth/signout";
+  const isOnboarding     = path === "/onboarding";
+  const isPublicRoute    = path === "/" || isAuthRoute;
+  const isApiRoute       = path.startsWith("/api");
 
-  if (!user && !isPublicRoute) {
+  // Unauthenticated — redirect to login
+  if (!user && !isPublicRoute && !isApiRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthRoute) {
+  // Authenticated on an auth page (but not signout) — redirect to dashboard
+  if (user && isAuthRoute && !isSignOut) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);
+  }
+
+  // Authenticated user — check if onboarding is needed
+  if (user && !isAuthRoute && !isOnboarding && !isApiRoute) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("height_cm, weight_kg, date_of_birth")
+      .eq("user_id", user.id)
+      .single();
+
+    const needsOnboarding =
+      !profile || !profile.height_cm || !profile.weight_kg || !profile.date_of_birth;
+
+    if (needsOnboarding) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/onboarding";
+      return NextResponse.redirect(url);
+    }
   }
 
   return supabaseResponse;
