@@ -1,6 +1,5 @@
 import { Metadata } from "next";
 import { SignupForm } from "@/components/auth/signup-form";
-import { Zap } from "lucide-react";
 
 export const metadata: Metadata = { title: "Create Account" };
 
@@ -8,40 +7,32 @@ export default function SignupPage() {
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-4"
-      style={{ backgroundColor: "var(--color-void)" }}
+      style={{ backgroundColor: "var(--color-ink)" }}
     >
-      {/* Logo */}
-      <div className="flex items-center gap-2.5 mb-10">
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center"
-          style={{ backgroundColor: "var(--color-amber)" }}
+      <div className="mb-10 text-center">
+        <p
+          className="font-display font-bold tracking-[0.25em] uppercase mb-1"
+          style={{ fontSize: 22, color: "var(--color-text-primary)" }}
         >
-          <Zap className="w-4 h-4" style={{ color: "var(--color-void)" }} />
-        </div>
-        <span
-          className="font-display font-bold text-xl tracking-tight"
-          style={{ color: "var(--color-text-primary)" }}
-        >
-          FitTrack Pro
-        </span>
+          FITTRACK
+        </p>
+        <p className="fig-label" style={{ fontSize: 11 }}>PERSONAL TRAINING LOG</p>
       </div>
 
       <div
-        className="w-full max-w-sm rounded-2xl border p-8"
+        className="w-full max-w-sm p-8"
         style={{
-          backgroundColor: "var(--color-surface)",
-          borderColor: "var(--color-border)",
+          backgroundColor: "var(--color-sheet)",
+          border: "1px solid var(--color-line)",
+          borderRadius: 2,
         }}
       >
-        <h1
-          className="text-xl font-semibold mb-1"
-          style={{ color: "var(--color-text-primary)" }}
-        >
-          Create your account
-        </h1>
-        <p className="text-sm mb-6" style={{ color: "var(--color-text-secondary)" }}>
-          Start tracking your progress today.
-        </p>
+        <div className="mb-6 pb-4" style={{ borderBottom: "1px solid var(--color-line)" }}>
+          <p className="fig-label mb-1" style={{ fontSize: 11 }}>Access — Create account</p>
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--color-text-secondary)" }}>
+            File a new drawing set.
+          </p>
+        </div>
         <SignupForm />
       </div>
     </div>

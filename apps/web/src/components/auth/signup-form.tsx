@@ -4,17 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 export function SignupForm() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [name,            setName]            = useState("");
+  const [email,           setEmail]           = useState("");
+  const [password,        setPassword]        = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [showPassword,    setShowPassword]    = useState(false);
+  const [loading,         setLoading]         = useState(false);
+  const [error,           setError]           = useState<string | null>(null);
+  const [success,         setSuccess]         = useState(false);
   const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
@@ -25,7 +24,6 @@ export function SignupForm() {
       setError("Passwords do not match.");
       return;
     }
-
     if (password.length < 8) {
       setError("Password must be at least 8 characters.");
       return;
@@ -34,57 +32,42 @@ export function SignupForm() {
     setLoading(true);
     const supabase = createClient();
 
-    const { error } = await supabase.auth.signUp({
+    const { error: signupError } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: { full_name: name },
-      },
+      options: { data: { full_name: name } },
     });
 
-    if (error) {
-      setError(error.message);
+    if (signupError) {
+      setError(signupError.message);
       setLoading(false);
       return;
     }
 
-    // Supabase sends a confirmation email by default.
-    // If email confirmation is disabled in the dashboard, redirect straight to dashboard.
     setSuccess(true);
     setLoading(false);
-
-    // Give the user a moment to read the success message, then redirect.
     setTimeout(() => router.push("/dashboard"), 2000);
   }
 
   const inputStyle = {
-    backgroundColor: "var(--color-inset)",
-    border: "1px solid var(--color-border)",
+    fontFamily: "var(--font-mono)",
+    backgroundColor: "var(--color-sheet-inset)",
+    border: "1px solid var(--color-line)",
     color: "var(--color-text-primary)",
-    borderRadius: 8,
-    padding: "10px 14px",
-    fontSize: 14,
+    borderRadius: 2,
+    padding: "10px 12px",
+    fontSize: 13,
+    letterSpacing: "0.04em",
     width: "100%",
     outline: "none",
-    transition: "border-color 120ms",
   } as const;
 
   if (success) {
     return (
-      <div className="text-center py-4">
-        <div
-          className="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-4"
-          style={{ backgroundColor: "rgba(22,163,74,0.15)", border: "1px solid rgba(22,163,74,0.3)" }}
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path d="M3 9l4.5 4.5L15 5" stroke="#16A34A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </div>
-        <p className="text-sm font-semibold mb-1" style={{ color: "var(--color-text-primary)" }}>
-          Account created!
-        </p>
-        <p className="text-sm" style={{ color: "var(--color-text-secondary)" }}>
-          Check your email to confirm, then you&apos;ll be redirected.
+      <div className="text-center py-6 space-y-3">
+        <p className="fig-label" style={{ color: "rgb(34,197,94)" }}>✓ ACCOUNT FILED</p>
+        <p style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--color-text-secondary)" }}>
+          Check your email to confirm, then redirecting…
         </p>
       </div>
     );
@@ -93,29 +76,23 @@ export function SignupForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="label-caps block mb-1.5" htmlFor="name">
-          Name
-        </label>
+        <p className="fig-label mb-2" style={{ fontSize: 10 }}>Name</p>
         <input
-          id="name"
           type="text"
           required
           autoComplete="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Your name"
+          placeholder="e.g. Alex Chen"
           style={inputStyle}
-          onFocus={(e) => (e.target.style.borderColor = "var(--color-amber)")}
-          onBlur={(e) => (e.target.style.borderColor = "var(--color-border)")}
+          onFocus={(e) => (e.target.style.borderColor = "var(--color-paper)")}
+          onBlur={(e)  => (e.target.style.borderColor = "var(--color-line)")}
         />
       </div>
 
       <div>
-        <label className="label-caps block mb-1.5" htmlFor="email">
-          Email
-        </label>
+        <p className="fig-label mb-2" style={{ fontSize: 10 }}>Email</p>
         <input
-          id="email"
           type="email"
           required
           autoComplete="email"
@@ -123,18 +100,15 @@ export function SignupForm() {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
           style={inputStyle}
-          onFocus={(e) => (e.target.style.borderColor = "var(--color-amber)")}
-          onBlur={(e) => (e.target.style.borderColor = "var(--color-border)")}
+          onFocus={(e) => (e.target.style.borderColor = "var(--color-paper)")}
+          onBlur={(e)  => (e.target.style.borderColor = "var(--color-line)")}
         />
       </div>
 
       <div>
-        <label className="label-caps block mb-1.5" htmlFor="password">
-          Password
-        </label>
+        <p className="fig-label mb-2" style={{ fontSize: 10 }}>Password</p>
         <div className="relative">
           <input
-            id="password"
             type={showPassword ? "text" : "password"}
             required
             autoComplete="new-password"
@@ -142,92 +116,82 @@ export function SignupForm() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Min. 8 characters"
             style={{ ...inputStyle, paddingRight: 40 }}
-            onFocus={(e) => (e.target.style.borderColor = "var(--color-amber)")}
-            onBlur={(e) => (e.target.style.borderColor = "var(--color-border)")}
+            onFocus={(e) => (e.target.style.borderColor = "var(--color-paper)")}
+            onBlur={(e)  => (e.target.style.borderColor = "var(--color-line)")}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-3 top-1/2 -translate-y-1/2"
+            className="absolute right-3 top-1/2 -translate-y-1/2 transition-opacity hover:opacity-70"
             style={{ color: "var(--color-text-ghost)" }}
           >
-            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            {showPassword ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            )}
           </button>
         </div>
       </div>
 
       <div>
-        <label className="label-caps block mb-1.5" htmlFor="confirm-password">
-          Confirm Password
-        </label>
+        <p className="fig-label mb-2" style={{ fontSize: 10 }}>Confirm password</p>
         <input
-          id="confirm-password"
           type={showPassword ? "text" : "password"}
           required
           autoComplete="new-password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          placeholder="Repeat your password"
+          placeholder="Repeat password"
           style={{
             ...inputStyle,
-            borderColor:
-              confirmPassword && confirmPassword !== password
-                ? "var(--color-red)"
-                : "var(--color-border)",
+            borderColor: confirmPassword && confirmPassword !== password
+              ? "var(--color-redline)"
+              : "var(--color-line)",
           }}
           onFocus={(e) => {
-            if (!confirmPassword || confirmPassword === password) {
-              e.target.style.borderColor = "var(--color-amber)";
-            }
+            if (!confirmPassword || confirmPassword === password)
+              e.target.style.borderColor = "var(--color-paper)";
           }}
           onBlur={(e) => {
-            e.target.style.borderColor =
-              confirmPassword && confirmPassword !== password
-                ? "var(--color-red)"
-                : "var(--color-border)";
+            e.target.style.borderColor = confirmPassword && confirmPassword !== password
+              ? "var(--color-redline)"
+              : "var(--color-line)";
           }}
         />
         {confirmPassword && confirmPassword !== password && (
-          <p className="text-xs mt-1.5" style={{ color: "var(--color-red)" }}>
-            Passwords don&apos;t match
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--color-redline)", marginTop: 4 }}>
+            ✕ Passwords don&apos;t match
           </p>
         )}
       </div>
 
       {error && (
-        <p
-          className="text-sm rounded-lg px-3 py-2"
-          style={{
-            color: "var(--color-red)",
-            backgroundColor: "rgba(220,38,38,0.08)",
-            border: "1px solid rgba(220,38,38,0.2)",
-          }}
-        >
-          {error}
-        </p>
+        <div style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 11,
+          color: "var(--color-redline)",
+          border: "1px solid rgba(220,38,38,0.3)",
+          backgroundColor: "rgba(220,38,38,0.06)",
+          borderRadius: 2,
+          padding: "8px 12px",
+        }}>
+          ✕ {error}
+        </div>
       )}
 
       <button
         type="submit"
         disabled={loading}
-        className="w-full py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-[120ms] disabled:opacity-60"
-        style={{
-          backgroundColor: "var(--color-amber)",
-          color: "var(--color-void)",
-          marginTop: 8,
-        }}
+        className="w-full py-3 font-display uppercase tracking-widest transition-all duration-150 disabled:opacity-50"
+        style={{ fontSize: 12, borderRadius: 2, backgroundColor: "var(--color-paper)", color: "var(--color-ink)", marginTop: 8 }}
       >
-        {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-        {loading ? "Creating account…" : "Create Account"}
+        {loading ? "FILING…" : "CREATE ACCOUNT"}
       </button>
 
-      <p className="text-center text-sm" style={{ color: "var(--color-text-secondary)" }}>
+      <p className="text-center" style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--color-text-ghost)" }}>
         Already have an account?{" "}
-        <Link
-          href="/auth/login"
-          style={{ color: "var(--color-amber)" }}
-          className="font-medium hover:opacity-80 transition-opacity"
-        >
+        <Link href="/auth/login" style={{ color: "var(--color-paper)" }} className="hover:opacity-70 transition-opacity">
           Sign in
         </Link>
       </p>
