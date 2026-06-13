@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useProfile, useUpdateProfile } from "@/lib/hooks/use-profile";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, LogOut, Save } from "lucide-react";
 import { DobPicker } from "@/components/ui/dob-picker";
 import { HeightInput } from "@/components/ui/height-input";
 import type { Database } from "@/lib/supabase/database.types";
@@ -13,12 +12,12 @@ type ActivityLevel = Database["public"]["Enums"]["activity_level"];
 type FitnessGoal   = Database["public"]["Enums"]["fitness_goal"];
 type Gender        = Database["public"]["Enums"]["gender_type"];
 
-const ACTIVITY_OPTIONS: { value: ActivityLevel; label: string }[] = [
-  { value: "sedentary",         label: "Sedentary"         },
-  { value: "lightly_active",    label: "Lightly Active"    },
-  { value: "moderately_active", label: "Moderately Active" },
-  { value: "very_active",       label: "Very Active"       },
-  { value: "extra_active",      label: "Extra Active"      },
+const ACTIVITY_OPTIONS: { value: ActivityLevel; label: string; annotation: string }[] = [
+  { value: "sedentary",         label: "Sedentary",          annotation: "desk job, no exercise" },
+  { value: "lightly_active",    label: "Lightly Active",     annotation: "1–3 days / week"       },
+  { value: "moderately_active", label: "Moderately Active",  annotation: "3–5 days / week"       },
+  { value: "very_active",       label: "Very Active",        annotation: "6–7 days / week"       },
+  { value: "extra_active",      label: "Extra Active",       annotation: "twice/day training"    },
 ];
 
 const GOAL_OPTIONS: { value: FitnessGoal; label: string }[] = [
@@ -28,16 +27,80 @@ const GOAL_OPTIONS: { value: FitnessGoal; label: string }[] = [
   { value: "strength",     label: "Pure Strength" },
 ];
 
+const MONO_INPUT = {
+  fontFamily: "var(--font-mono)",
+  backgroundColor: "var(--color-sheet-inset)",
+  border: "1px solid var(--color-line)",
+  color: "var(--color-text-primary)",
+  borderRadius: 2,
+  padding: "10px 12px",
+  fontSize: 13,
+  letterSpacing: "0.04em",
+  width: "100%",
+  outline: "none",
+} as const;
+
+function Section({ fig, title, children }: { fig: string; title: string; children: React.ReactNode }) {
+  return (
+    <div className="sheet p-6 space-y-5">
+      <div className="pb-3 border-b" style={{ borderColor: "var(--color-line)" }}>
+        <p className="fig-label mb-0.5" style={{ fontSize: 11 }}>{fig}</p>
+        <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--color-text-secondary)", letterSpacing: "0.06em" }}>{title}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="fig-label mb-2" style={{ fontSize: 10 }}>{label}</p>
+      {children}
+    </div>
+  );
+}
+
+function UnitToggle({ options, value, onChange }: { options: { value: string; label: string }[]; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex gap-1">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className="px-2.5 py-1 font-display uppercase transition-all duration-150"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.1em",
+            borderRadius: 2,
+            backgroundColor: value === o.value ? "var(--color-paper)" : "transparent",
+            color: value === o.value ? "var(--color-ink)" : "var(--color-text-ghost)",
+            border: `1px solid ${value === o.value ? "var(--color-paper)" : "var(--color-line)"}`,
+          }}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function SettingsForm() {
-  const router   = useRouter();
+  const router = useRouter();
   const { data: profile, isLoading } = useProfile();
   const updateProfile = useUpdateProfile();
 
-  const [name,     setName]     = useState("");
-  const [dob,      setDob]      = useState("");
-  const [gender,   setGender]   = useState<Gender | "">("");
+  const [name,       setName]       = useState("");
+  const [dob,        setDob]        = useState("");
+  const [gender,     setGender]     = useState<Gender | "">("");
   const [height,     setHeight]     = useState("");
   const [weight,     setWeight]     = useState("");
+  const [activity,   setActivity]   = useState<ActivityLevel>("moderately_active");
+  const [goal,       setGoal]       = useState<FitnessGoal>("build_muscle");
+  const [saved,      setSaved]      = useState(false);
+  const [saveError,  setSaveError]  = useState<string | null>(null);
+
   const [heightUnit, setHeightUnit] = useState<"metric" | "imperial">(() => {
     if (typeof window === "undefined") return "metric";
     return (localStorage.getItem("settings_heightUnit") as "metric" | "imperial") ?? "metric";
@@ -46,13 +109,8 @@ export function SettingsForm() {
     if (typeof window === "undefined") return "kg";
     return (localStorage.getItem("settings_weightUnit") as "kg" | "lbs") ?? "kg";
   });
-  // Ref so the profile useEffect can read the current unit without becoming a dep
   const weightUnitRef = useRef(weightUnit);
-  const [activity, setActivity] = useState<ActivityLevel>("moderately_active");
-  const [goal,     setGoal]     = useState<FitnessGoal>("build_muscle");
-  const [saved,    setSaved]    = useState(false);
 
-  // Keep ref in sync and persist unit preferences to localStorage
   useEffect(() => {
     weightUnitRef.current = weightUnit;
     localStorage.setItem("settings_weightUnit", weightUnit);
@@ -68,8 +126,6 @@ export function SettingsForm() {
       setDob(profile.date_of_birth ?? "");
       setGender((profile.gender as Gender) ?? "");
       setHeight(String(profile.height_cm ?? ""));
-      // Convert the stored kg value into whatever unit the user currently has selected,
-      // so the display stays consistent and the toggle doesn't reset after a save.
       const kg = profile.weight_kg ?? 0;
       setWeight(
         kg
@@ -83,37 +139,41 @@ export function SettingsForm() {
     }
   }, [profile]);
 
-  // Convert displayed weight when unit toggles
-  function handleWeightUnitChange(unit: "kg" | "lbs") {
+  function handleWeightUnitChange(unit: string) {
+    const u = unit as "kg" | "lbs";
     const current = parseFloat(weight);
     if (current && !isNaN(current)) {
-      if (unit === "lbs" && weightUnit === "kg") {
+      if (u === "lbs" && weightUnit === "kg") {
         setWeight(String(Math.round(current * 2.20462 * 10) / 10));
-      } else if (unit === "kg" && weightUnit === "lbs") {
+      } else if (u === "kg" && weightUnit === "lbs") {
         setWeight(String(Math.round((current / 2.20462) * 10) / 10));
       }
     }
-    setWeightUnit(unit);
+    setWeightUnit(u);
   }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!profile) return;
+    setSaveError(null);
     const rawWeight = parseFloat(weight);
     const weightKg  = weightUnit === "lbs" ? rawWeight / 2.20462 : rawWeight;
-
-    await updateProfile.mutateAsync({
-      user_id: profile.user_id,
-      name:           name.trim(),
-      date_of_birth:  dob || null,
-      gender:         gender as Gender || null,
-      height_cm:      parseFloat(height) || null,
-      weight_kg:      rawWeight ? Math.round(weightKg * 10) / 10 : null,
-      activity_level: activity,
-      goal,
-    });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    try {
+      await updateProfile.mutateAsync({
+        user_id:        profile.user_id,
+        name:           name.trim(),
+        date_of_birth:  dob || null,
+        gender:         (gender as Gender) || null,
+        height_cm:      parseFloat(height) || null,
+        weight_kg:      rawWeight ? Math.round(weightKg * 10) / 10 : null,
+        activity_level: activity,
+        goal,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Failed to save settings");
+    }
   }
 
   async function handleSignOut() {
@@ -123,21 +183,10 @@ export function SettingsForm() {
     router.refresh();
   }
 
-  const inputStyle = {
-    backgroundColor: "var(--color-inset)",
-    border: "1px solid var(--color-border)",
-    color: "var(--color-text-primary)",
-    borderRadius: 8,
-    padding: "10px 14px",
-    fontSize: 14,
-    width: "100%",
-    outline: "none",
-  } as const;
-
   if (isLoading) {
     return (
       <div className="space-y-4">
-        {Array.from({ length: 5 }).map((_, i) => <div key={i} className="skeleton h-12 rounded-xl" />)}
+        {Array.from({ length: 4 }).map((_, i) => <div key={i} className="skeleton h-32" style={{ borderRadius: 2 }} />)}
       </div>
     );
   }
@@ -145,73 +194,70 @@ export function SettingsForm() {
   return (
     <div className="space-y-6">
       <form onSubmit={handleSave} className="space-y-5">
-        <div className="rounded-xl border p-6 space-y-5" style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}>
-          <p className="label-caps">Personal Info</p>
+        {/* Personal info */}
+        <Section fig="Spec A — Personal" title="IDENTITY">
+          <FieldRow label="Display name">
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Alex Chen"
+              style={MONO_INPUT}
+              onFocus={(e) => (e.target.style.borderColor = "var(--color-paper)")}
+              onBlur={(e)  => (e.target.style.borderColor = "var(--color-line)")}
+            />
+          </FieldRow>
 
-          <div>
-            <label className="label-caps block mb-1.5">Name</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} style={inputStyle}
-              onFocus={(e) => (e.target.style.borderColor = "var(--color-amber)")} onBlur={(e) => (e.target.style.borderColor = "var(--color-border)")} />
-          </div>
-
-          <div>
-            <label className="label-caps block mb-2">Date of Birth</label>
+          <FieldRow label="Date of birth">
             <DobPicker value={dob} onChange={setDob} />
-          </div>
+          </FieldRow>
 
-          <div>
-            <label className="label-caps block mb-2">Sex</label>
-            <div className="grid grid-cols-2 gap-3">
+          <FieldRow label="Sex">
+            <div className="grid grid-cols-2 gap-2">
               {(["male", "female"] as Gender[]).map((g) => (
-                <button key={g} type="button" onClick={() => setGender(g)}
-                  className="py-2.5 rounded-lg font-semibold text-sm capitalize transition-all duration-[120ms]"
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setGender(g)}
+                  className="py-2.5 font-display uppercase transition-all duration-150"
                   style={{
-                    backgroundColor: gender === g ? "var(--color-amber)" : "var(--color-inset)",
-                    color: gender === g ? "var(--color-void)" : "var(--color-text-secondary)",
-                    border: `1px solid ${gender === g ? "var(--color-amber)" : "var(--color-border)"}`,
-                  }}>
+                    fontSize: 12,
+                    letterSpacing: "0.08em",
+                    borderRadius: 2,
+                    backgroundColor: gender === g ? "var(--color-paper)" : "transparent",
+                    color: gender === g ? "var(--color-ink)" : "var(--color-text-secondary)",
+                    border: `1px solid ${gender === g ? "var(--color-paper)" : "var(--color-line)"}`,
+                  }}
+                >
                   {g}
                 </button>
               ))}
             </div>
-          </div>
-        </div>
+          </FieldRow>
+        </Section>
 
-        <div className="rounded-xl border p-6 space-y-5" style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}>
-          <p className="label-caps">Body Stats</p>
-
-          <div>
+        {/* Body stats */}
+        <Section fig="Spec B — Biometrics" title="BODY STATS">
+          <FieldRow label="Height">
             <div className="flex items-center justify-between mb-2">
-              <label className="label-caps">Height</label>
-              <div className="flex gap-1.5">
-                {(["metric", "imperial"] as const).map((u) => (
-                  <button key={u} type="button" onClick={() => setHeightUnit(u)}
-                    className="px-2.5 py-1 rounded text-xs font-semibold transition-all duration-[120ms]"
-                    style={{ backgroundColor: heightUnit === u ? "var(--color-amber)" : "var(--color-inset)", color: heightUnit === u ? "var(--color-void)" : "var(--color-text-secondary)", border: `1px solid ${heightUnit === u ? "var(--color-amber)" : "var(--color-border)"}` }}>
-                    {u === "metric" ? "cm" : "ft·in"}
-                  </button>
-                ))}
-              </div>
+              <span />
+              <UnitToggle
+                options={[{ value: "metric", label: "CM" }, { value: "imperial", label: "FT·IN" }]}
+                value={heightUnit}
+                onChange={(v) => setHeightUnit(v as "metric" | "imperial")}
+              />
             </div>
             <HeightInput valueCm={height} onChange={setHeight} unit={heightUnit} />
-          </div>
+          </FieldRow>
 
-          <div>
+          <FieldRow label="Body weight">
             <div className="flex items-center justify-between mb-2">
-              <label className="label-caps">Weight</label>
-              <div className="flex gap-1.5">
-                {(["kg", "lbs"] as const).map((u) => (
-                  <button key={u} type="button" onClick={() => handleWeightUnitChange(u)}
-                    className="px-2.5 py-1 rounded text-xs font-semibold transition-all duration-[120ms]"
-                    style={{
-                      backgroundColor: weightUnit === u ? "var(--color-amber)" : "var(--color-inset)",
-                      color: weightUnit === u ? "var(--color-void)" : "var(--color-text-secondary)",
-                      border: `1px solid ${weightUnit === u ? "var(--color-amber)" : "var(--color-border)"}`,
-                    }}>
-                    {u}
-                  </button>
-                ))}
-              </div>
+              <span />
+              <UnitToggle
+                options={[{ value: "kg", label: "KG" }, { value: "lbs", label: "LBS" }]}
+                value={weightUnit}
+                onChange={handleWeightUnitChange}
+              />
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -220,76 +266,112 @@ export function SettingsForm() {
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
                 placeholder={weightUnit === "lbs" ? "e.g. 176" : "e.g. 80"}
-                style={inputStyle}
-                onFocus={(e) => (e.target.style.borderColor = "var(--color-amber)")}
-                onBlur={(e)  => (e.target.style.borderColor = "var(--color-border)")}
+                style={MONO_INPUT}
+                onFocus={(e) => (e.target.style.borderColor = "var(--color-paper)")}
+                onBlur={(e)  => (e.target.style.borderColor = "var(--color-line)")}
               />
-              <span className="text-sm shrink-0" style={{ color: "var(--color-text-secondary)" }}>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--color-text-ghost)", whiteSpace: "nowrap" }}>
                 {weightUnit}
               </span>
             </div>
-          </div>
-        </div>
+          </FieldRow>
+        </Section>
 
-        <div className="rounded-xl border p-6 space-y-4" style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}>
-          <p className="label-caps">Training</p>
-
-          <div>
-            <label className="label-caps block mb-2">Activity Level</label>
-            <div className="space-y-2">
+        {/* Training */}
+        <Section fig="Spec C — Training" title="PROGRAMME">
+          <FieldRow label="Activity level">
+            <div className="space-y-1.5">
               {ACTIVITY_OPTIONS.map((a) => (
-                <button key={a.value} type="button" onClick={() => setActivity(a.value)}
-                  className="w-full px-4 py-2.5 rounded-lg text-left text-sm font-semibold transition-all duration-[120ms]"
+                <button
+                  key={a.value}
+                  type="button"
+                  onClick={() => setActivity(a.value)}
+                  className="w-full px-4 py-2.5 text-left flex items-center justify-between transition-all duration-150"
                   style={{
-                    backgroundColor: activity === a.value ? "var(--color-amber-dim)" : "var(--color-inset)",
-                    color: activity === a.value ? "var(--color-amber)" : "var(--color-text-secondary)",
-                    border: `1px solid ${activity === a.value ? "var(--color-amber)" : "var(--color-border)"}`,
-                  }}>
-                  {a.label}
+                    borderRadius: 2,
+                    backgroundColor: activity === a.value ? "rgba(143,180,217,0.08)" : "transparent",
+                    border: `1px solid ${activity === a.value ? "var(--color-line-bright)" : "var(--color-line)"}`,
+                  }}
+                >
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: activity === a.value ? "var(--color-text-primary)" : "var(--color-text-secondary)", letterSpacing: "0.06em" }}>
+                    {a.label.toUpperCase()}
+                  </span>
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--color-text-ghost)", letterSpacing: "0.06em" }}>
+                    {a.annotation}
+                  </span>
                 </button>
               ))}
             </div>
-          </div>
+          </FieldRow>
 
-          <div>
-            <label className="label-caps block mb-2">Goal</label>
+          <FieldRow label="Goal">
             <div className="grid grid-cols-2 gap-2">
               {GOAL_OPTIONS.map((g) => (
-                <button key={g.value} type="button" onClick={() => setGoal(g.value)}
-                  className="px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-[120ms]"
+                <button
+                  key={g.value}
+                  type="button"
+                  onClick={() => setGoal(g.value)}
+                  className="py-2.5 font-display uppercase transition-all duration-150"
                   style={{
-                    backgroundColor: goal === g.value ? "var(--color-amber)" : "var(--color-inset)",
-                    color: goal === g.value ? "var(--color-void)" : "var(--color-text-secondary)",
-                    border: `1px solid ${goal === g.value ? "var(--color-amber)" : "var(--color-border)"}`,
-                  }}>
+                    fontSize: 11,
+                    letterSpacing: "0.08em",
+                    borderRadius: 2,
+                    backgroundColor: goal === g.value ? "var(--color-paper)" : "transparent",
+                    color: goal === g.value ? "var(--color-ink)" : "var(--color-text-secondary)",
+                    border: `1px solid ${goal === g.value ? "var(--color-paper)" : "var(--color-line)"}`,
+                  }}
+                >
                   {g.label}
                 </button>
               ))}
             </div>
-          </div>
-        </div>
+          </FieldRow>
+        </Section>
+
+        {saveError && (
+          <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--color-redline)" }}>
+            ✕ {saveError}
+          </p>
+        )}
 
         <button
           type="submit"
           disabled={updateProfile.isPending}
-          className="w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all duration-[120ms] disabled:opacity-50"
-          style={{ backgroundColor: saved ? "var(--color-green)" : "var(--color-amber)", color: "var(--color-void)" }}
+          className="w-full py-3 font-display uppercase tracking-widest transition-all duration-150 disabled:opacity-50"
+          style={{
+            fontSize: 12,
+            borderRadius: 2,
+            backgroundColor: saved ? "rgba(34,197,94,0.15)" : "var(--color-paper)",
+            color: saved ? "rgb(34,197,94)" : "var(--color-ink)",
+            border: `1px solid ${saved ? "rgba(34,197,94,0.5)" : "var(--color-paper)"}`,
+          }}
         >
-          {updateProfile.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          {updateProfile.isPending ? "Saving…" : saved ? "Saved!" : "Save Changes"}
+          {updateProfile.isPending ? "FILING…" : saved ? "✓ FILED" : "FILE CHANGES"}
         </button>
       </form>
 
-      {/* Danger zone */}
-      <div className="rounded-xl border p-6" style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}>
-        <p className="label-caps mb-4">Account</p>
+      {/* Account */}
+      <div className="sheet p-6">
+        <div className="pb-3 mb-4 border-b" style={{ borderColor: "var(--color-line)" }}>
+          <p className="fig-label" style={{ fontSize: 11 }}>Spec D — Account</p>
+        </div>
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all duration-[120ms] hover:bg-red-950"
-          style={{ color: "var(--color-red)", border: "1px solid rgba(220,38,38,0.3)" }}
+          className="flex items-center gap-2 px-4 py-2.5 font-display uppercase transition-all duration-150"
+          style={{
+            fontSize: 11,
+            letterSpacing: "0.08em",
+            borderRadius: 2,
+            color: "var(--color-redline)",
+            border: "1px solid rgba(220,38,38,0.3)",
+          }}
         >
-          <LogOut className="w-4 h-4" />
-          Sign Out
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          SIGN OUT
         </button>
       </div>
     </div>
