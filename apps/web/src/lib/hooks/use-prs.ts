@@ -39,7 +39,7 @@ export function useExercisePRs(exerciseId: string | null) {
         .select("*")
         .eq("user_id", user.id)
         .eq("exercise_id", exerciseId)
-        .single();
+        .maybeSingle();
 
       return data ?? null;
     },
