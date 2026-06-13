@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Search, X } from "lucide-react";
 import { useExercises } from "@/lib/hooks/use-exercises";
 import { MUSCLE_GROUP_LABELS, MUSCLE_GROUP_ORDER } from "@fittrack/shared";
 import type { Database } from "@/lib/supabase/database.types";
@@ -9,40 +8,29 @@ import type { Database } from "@/lib/supabase/database.types";
 type MuscleGroup = Database["public"]["Enums"]["muscle_group"];
 type Equipment   = Database["public"]["Enums"]["equipment_type"];
 
-const EQUIPMENT_OPTIONS: { value: Equipment; label: string; color: string }[] = [
-  { value: "barbell",     label: "Barbell",     color: "#F59E0B" },
-  { value: "dumbbell",    label: "Dumbbell",    color: "#3B82F6" },
-  { value: "cable",       label: "Cable",       color: "#8B5CF6" },
-  { value: "machine",     label: "Machine",     color: "#6B7280" },
-  { value: "bodyweight",  label: "Bodyweight",  color: "#16A34A" },
-  { value: "kettlebell",  label: "Kettlebell",  color: "#EF4444" },
-  { value: "bands",       label: "Bands",       color: "#EC4899" },
-  { value: "other",       label: "Other",       color: "#9CA3AF" },
+const EQUIPMENT_OPTIONS: { value: Equipment; label: string }[] = [
+  { value: "barbell",    label: "Barbell"    },
+  { value: "dumbbell",   label: "Dumbbell"   },
+  { value: "cable",      label: "Cable"      },
+  { value: "machine",    label: "Machine"    },
+  { value: "bodyweight", label: "Bodyweight" },
+  { value: "kettlebell", label: "Kettlebell" },
+  { value: "bands",      label: "Bands"      },
+  { value: "other",      label: "Other"      },
 ];
 
-const EQUIPMENT_COLOR: Record<string, string> = Object.fromEntries(
-  EQUIPMENT_OPTIONS.map((e) => [e.value, e.color])
-);
-
-function FilterChip({
-  label,
-  active,
-  activeColor,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  activeColor?: string;
-  onClick: () => void;
-}) {
+function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all duration-[120ms]"
+      className="px-2.5 py-1 font-display uppercase whitespace-nowrap transition-all duration-150"
       style={{
-        backgroundColor: active ? (activeColor ?? "var(--color-amber)") : "var(--color-surface)",
-        color: active ? (activeColor ? "white" : "var(--color-void)") : "var(--color-text-secondary)",
-        border: `1px solid ${active ? (activeColor ?? "var(--color-amber)") : "var(--color-border)"}`,
+        fontSize: 11,
+        letterSpacing: "0.1em",
+        borderRadius: 2,
+        backgroundColor: active ? "var(--color-paper)" : "transparent",
+        color: active ? "var(--color-ink)" : "var(--color-text-secondary)",
+        border: `1px solid ${active ? "var(--color-paper)" : "var(--color-line)"}`,
       }}
     >
       {label}
@@ -66,41 +54,47 @@ export function ExerciseLibrary() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Search */}
       <div className="relative">
-        <Search
-          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+        <svg
+          className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+          width="14" height="14" viewBox="0 0 16 16" fill="none"
           style={{ color: "var(--color-text-ghost)" }}
-        />
+        >
+          <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.25" />
+          <line x1="10.5" y1="10.5" x2="14" y2="14" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+        </svg>
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search exercises…"
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm"
+          placeholder="Search index…"
+          className="w-full pl-9 pr-4 py-2.5 text-sm"
           style={{
-            backgroundColor: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
+            fontFamily: "var(--font-mono)",
+            backgroundColor: "var(--color-sheet-inset)",
+            border: "1px solid var(--color-line)",
             color: "var(--color-text-primary)",
+            borderRadius: 2,
             outline: "none",
+            letterSpacing: "0.04em",
           }}
-          onFocus={(e) => (e.target.style.borderColor = "var(--color-amber)")}
-          onBlur={(e)  => (e.target.style.borderColor = "var(--color-border)")}
+          onFocus={(e) => (e.target.style.borderColor = "var(--color-paper)")}
+          onBlur={(e)  => (e.target.style.borderColor = "var(--color-line)")}
         />
       </div>
 
       {/* Equipment filter */}
       <div>
-        <p className="label-caps mb-2">Equipment</p>
-        <div className="flex gap-2 flex-wrap">
+        <p className="fig-label mb-2" style={{ fontSize: 11 }}>Equipment type</p>
+        <div className="flex gap-1.5 flex-wrap">
           <FilterChip label="All" active={equipment === "all"} onClick={() => setEquipment("all")} />
           {EQUIPMENT_OPTIONS.map((eq) => (
             <FilterChip
               key={eq.value}
               label={eq.label}
               active={equipment === eq.value}
-              activeColor={eq.color}
               onClick={() => setEquipment(equipment === eq.value ? "all" : eq.value)}
             />
           ))}
@@ -109,8 +103,8 @@ export function ExerciseLibrary() {
 
       {/* Muscle group filter */}
       <div>
-        <p className="label-caps mb-2">Muscle Group</p>
-        <div className="flex gap-2 flex-wrap">
+        <p className="fig-label mb-2" style={{ fontSize: 11 }}>Muscle group</p>
+        <div className="flex gap-1.5 flex-wrap">
           <FilterChip label="All" active={muscle === "all"} onClick={() => setMuscle("all")} />
           {MUSCLE_GROUP_ORDER.map((mg) => (
             <FilterChip
@@ -123,72 +117,112 @@ export function ExerciseLibrary() {
         </div>
       </div>
 
-      {/* Active filter summary + clear */}
-      <div className="flex items-center justify-between">
-        <p className="label-caps">
-          {isLoading ? "Loading…" : `${exercises?.length ?? 0} exercises`}
+      {/* Count + clear */}
+      <div
+        className="flex items-center justify-between py-2 border-b"
+        style={{ borderColor: "var(--color-line-bright)" }}
+      >
+        <p className="fig-label" style={{ fontSize: 11 }}>
+          {isLoading ? "SCANNING…" : `${exercises?.length ?? 0} ENTRIES`}
         </p>
         {hasFilters && (
           <button
             onClick={clearAll}
-            className="flex items-center gap-1.5 text-xs font-medium transition-colors duration-[120ms] hover:opacity-80"
-            style={{ color: "var(--color-amber)" }}
+            className="fig-label transition-opacity duration-150 hover:opacity-60"
+            style={{ fontSize: 11, color: "var(--color-redline)" }}
           >
-            <X className="w-3.5 h-3.5" />
-            Clear filters
+            ✕ CLEAR FILTERS
           </button>
         )}
       </div>
 
-      {/* Grid */}
+      {/* Catalog index */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {Array.from({ length: 9 }).map((_, i) => (
-            <div key={i} className="skeleton h-24 rounded-xl" />
+        <div className="space-y-px">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} className="skeleton h-12" style={{ borderRadius: 0 }} />
           ))}
         </div>
       ) : (exercises ?? []).length === 0 ? (
-        <div className="text-center py-16 space-y-3">
-          <p style={{ color: "var(--color-text-ghost)", fontSize: 14 }}>
-            {search ? `No exercises matching "${search}"` : "No exercises match the selected filters."}
+        <div
+          className="py-16 flex flex-col items-center gap-3 border"
+          style={{ borderColor: "var(--color-line)", borderStyle: "dashed", borderRadius: 2 }}
+        >
+          <p className="fig-label" style={{ fontSize: 12 }}>
+            {search ? `NO MATCH — "${search.toUpperCase()}"` : "NO ENTRIES MATCH FILTERS"}
           </p>
-          <button onClick={clearAll} className="text-sm font-medium" style={{ color: "var(--color-amber)" }}>
-            Clear all filters
+          <button onClick={clearAll} className="bp-btn-outline" style={{ fontSize: 11 }}>
+            CLEAR FILTERS
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {(exercises ?? []).map((ex) => (
+        <div className="sheet overflow-hidden">
+          {/* Table header */}
+          <div
+            className="grid px-4 py-2 border-b gap-x-4"
+            style={{
+              gridTemplateColumns: "2.5rem 1fr 7rem",
+              borderColor: "var(--color-line-bright)",
+              backgroundColor: "var(--color-sheet-inset)",
+            }}
+          >
+            {["NO.", "EXERCISE", "EQUIPMENT"].map((h) => (
+              <span key={h} className="fig-label" style={{ fontSize: 10 }}>{h}</span>
+            ))}
+          </div>
+
+          {(exercises ?? []).map((ex, i) => (
             <div
               key={ex.id}
-              className="rounded-xl border p-4 transition-all duration-[120ms] hover:border-[var(--color-border-bright)]"
-              style={{ backgroundColor: "var(--color-surface)", borderColor: "var(--color-border)" }}
+              className="grid px-4 py-3 border-b gap-x-4 transition-colors duration-100"
+              style={{
+                gridTemplateColumns: "2.5rem 1fr 7rem",
+                borderColor: "var(--color-line)",
+                backgroundColor: "transparent",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-sheet-inset)")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <p className="text-sm font-semibold leading-snug" style={{ color: "var(--color-text-primary)" }}>
+              {/* Row number */}
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--color-text-ghost)", paddingTop: 1 }}>
+                {String(i + 1).padStart(3, "0")}
+              </span>
+
+              {/* Name + muscle info */}
+              <div>
+                <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--color-text-primary)", lineHeight: 1.3 }}>
                   {ex.name}
                 </p>
-                <span
-                  className="px-2 py-0.5 rounded text-xs font-semibold shrink-0"
-                  style={{
-                    backgroundColor: `${EQUIPMENT_COLOR[ex.equipment] ?? "#6B7280"}18`,
-                    color: EQUIPMENT_COLOR[ex.equipment] ?? "#6B7280",
-                    border: `1px solid ${EQUIPMENT_COLOR[ex.equipment] ?? "#6B7280"}30`,
-                  }}
-                >
-                  {EQUIPMENT_OPTIONS.find((e) => e.value === ex.equipment)?.label ?? ex.equipment}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="label-caps" style={{ color: "var(--color-amber)" }}>
+                <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--color-text-secondary)", marginTop: 2, letterSpacing: "0.06em" }}>
                   {MUSCLE_GROUP_LABELS[ex.muscle_group as MuscleGroup] ?? ex.muscle_group}
-                </span>
-                {(ex.secondary_muscles as string[]).slice(0, 2).map((m) => (
-                  <span key={m} className="label-caps">
-                    {MUSCLE_GROUP_LABELS[m as MuscleGroup] ?? m}
-                  </span>
-                ))}
+                  {(ex.secondary_muscles as string[]).length > 0 && (
+                    <span style={{ color: "var(--color-text-ghost)" }}>
+                      {" · "}
+                      {(ex.secondary_muscles as string[]).slice(0, 2).map((m) => MUSCLE_GROUP_LABELS[m as MuscleGroup] ?? m).join(", ")}
+                    </span>
+                  )}
+                </p>
               </div>
+
+              {/* Equipment */}
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  letterSpacing: "0.08em",
+                  color: "var(--color-text-ghost)",
+                  border: "1px solid var(--color-line)",
+                  borderRadius: 2,
+                  padding: "2px 6px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  width: "fit-content",
+                  height: "fit-content",
+                  marginTop: 2,
+                }}
+              >
+                {EQUIPMENT_OPTIONS.find((e) => e.value === ex.equipment)?.label.toUpperCase() ?? ex.equipment.toUpperCase()}
+              </span>
             </div>
           ))}
         </div>
