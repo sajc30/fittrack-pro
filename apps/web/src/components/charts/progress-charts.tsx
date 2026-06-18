@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { useWeightUnit, formatKg } from "@/lib/hooks/use-weight-unit";
 import {
   LineChart,
   Line,
@@ -48,6 +49,7 @@ interface E1rmPoint {
 }
 
 function StrengthTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: E1rmPoint }> }) {
+  const { unit, label } = useWeightUnit();
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
   return (
@@ -62,11 +64,11 @@ function StrengthTooltip({ active, payload }: { active?: boolean; payload?: Arra
       }}
     >
       <p style={{ color: "var(--color-text-primary)", fontSize: 13 }}>
-        {p.e1rm} KG <span style={{ color: "var(--color-text-ghost)", fontSize: 11 }}>E1RM</span>
+        {formatKg(p.e1rm, unit)} {label} <span style={{ color: "var(--color-text-ghost)", fontSize: 11 }}>E1RM</span>
         {p.isPR && <span style={{ color: "var(--color-redline)", fontSize: 11 }}> · PR</span>}
       </p>
       <p style={{ color: "var(--color-text-secondary)", fontSize: 11, marginTop: 2 }}>
-        {p.weight} KG × {p.reps} — {p.date.toUpperCase()}
+        {formatKg(p.weight, unit)} {label} × {p.reps} — {p.date.toUpperCase()}
       </p>
     </div>
   );
@@ -99,6 +101,7 @@ function VolumeTooltip({ active, payload }: { active?: boolean; payload?: Array<
 export function ProgressCharts() {
   const [selectedExerciseId, setSelectedExerciseId] = useState<string>("");
   const [range, setRange] = useState<"3m" | "6m" | "1y" | "all">("3m");
+  const { unit, label } = useWeightUnit();
 
   const { data: exercises } = useLoggedExercises();
   const { data: strengthData, isLoading: strengthLoading } = useStrengthHistory(selectedExerciseId || null);
@@ -141,12 +144,12 @@ export function ProgressCharts() {
       .sort((a, b) => a.date.getTime() - b.date.getTime())
       .map((p) => ({
         date: format(p.date, dateFmt),
-        e1rm: p.e1rm,
-        weight: p.weight,
+        e1rm: unit === "lbs" ? p.e1rm * 2.20462 : p.e1rm,
+        weight: unit === "lbs" ? p.weight * 2.20462 : p.weight,
         reps: p.reps,
         isPR: p.isPR,
       }));
-  }, [strengthData, rangeDate, dateFmt]);
+  }, [strengthData, rangeDate, dateFmt, unit]);
 
   // Weekly volume — 12-week history
   const volumeData = useMemo(() => {
@@ -198,7 +201,7 @@ export function ProgressCharts() {
         <div className="flex flex-col gap-3 mb-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="fig-label mb-1">Fig. 1 — Strength (est. 1RM, kg)</p>
+              <p className="fig-label mb-1">Fig. 1 — Strength (est. 1RM, {label.toLowerCase()})</p>
               <p className="label-caps" style={{ fontSize: 11 }}>
                 Best set per session · <span style={{ color: "var(--color-redline)" }}>◦ record</span>
               </p>

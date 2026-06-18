@@ -12,6 +12,9 @@ export const metadata: Metadata = {
   description:
     "The serious athlete's training companion. Track workouts, visualize progress, and dominate your goals.",
   keywords: ["gym", "workout tracker", "fitness", "strength training", "progress"],
+  icons: {
+    apple: { url: "/apple-touch-icon.png", sizes: "180x180" },
+  },
 };
 
 export default function RootLayout({

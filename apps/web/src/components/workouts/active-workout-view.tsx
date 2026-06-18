@@ -9,6 +9,7 @@ import {
   useFinishWorkout,
   useLogSet,
 } from "@/lib/hooks/use-workouts";
+import { useWeightUnit, toKg } from "@/lib/hooks/use-weight-unit";
 import { ExercisePicker } from "./exercise-picker";
 import { estimateOneRepMax } from "@fittrack/shared";
 import { createClient } from "@/lib/supabase/client";
@@ -48,6 +49,7 @@ export function ActiveWorkoutView() {
   const deleteWorkout = useDeleteWorkout();
   const finishWorkout = useFinishWorkout();
   const logSet = useLogSet();
+  const { unit, label } = useWeightUnit();
 
   const [showPicker, setShowPicker] = useState(false);
   const [workoutName, setWorkoutName] = useState("Morning Workout");
@@ -94,17 +96,18 @@ export function ActiveWorkoutView() {
     if (!store.workoutId) return;
     const ex = store.exercises[exerciseIndex];
     const s = ex.sets[setIndex];
-    const weight = parseFloat(s.weight);
+    const weightInUnit = parseFloat(s.weight);
     const reps = parseInt(s.reps);
-    if (!weight || !reps) return;
+    if (!weightInUnit || !reps) return;
 
+    const weightKg = toKg(weightInUnit, unit);
     setActionError(null);
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const e1rm = estimateOneRepMax(weight, reps);
+      const e1rm = estimateOneRepMax(weightKg, reps);
       // Read the current PR only to decide the celebration UX — the DB trigger
       // on workout_sets is what actually maintains personal_records.
       const { data: currentPR } = await supabase
@@ -121,7 +124,7 @@ export function ActiveWorkoutView() {
         exercise_id: ex.exerciseId,
         set_number: setIndex + 1,
         reps,
-        weight_kg: weight,
+        weight_kg: weightKg,
         is_pr: isPR,
       });
 
@@ -388,7 +391,7 @@ export function ActiveWorkoutView() {
                 {/* Column headers */}
                 <div className="grid grid-cols-12 gap-2 px-1">
                   <span className="col-span-1 label-caps">#</span>
-                  <span className="col-span-4 label-caps">Load (kg)</span>
+                  <span className="col-span-4 label-caps">Load ({label.toLowerCase()})</span>
                   <span className="col-span-4 label-caps">Reps</span>
                   <span className="col-span-3 label-caps">Log</span>
                 </div>

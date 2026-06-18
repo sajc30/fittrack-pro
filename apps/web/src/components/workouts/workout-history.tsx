@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useWeightUnit, formatKg } from "@/lib/hooks/use-weight-unit";
 import {
   useWorkouts,
   useDeleteWorkout,
@@ -69,6 +70,7 @@ function EditExerciseBlock({
   onChangeSet: (idx: number, field: "weight" | "reps", value: string) => void;
   onMarkDelete: (idx: number) => void;
 }) {
+  const { label } = useWeightUnit();
   const inputStyle = {
     backgroundColor: "var(--color-sheet-inset)",
     border: "1px solid var(--color-line)",
@@ -99,7 +101,7 @@ function EditExerciseBlock({
       {/* Column headers */}
       <div className="grid grid-cols-12 gap-2 px-1 mb-1.5">
         <span className="col-span-1 label-caps text-center">#</span>
-        <span className="col-span-5 label-caps">Load (kg)</span>
+        <span className="col-span-5 label-caps">Load ({label.toLowerCase()})</span>
         <span className="col-span-4 label-caps">Reps</span>
         <span className="col-span-2" />
       </div>
@@ -386,6 +388,7 @@ function ReadOnlySets({
 }: {
   byExercise: Record<string, { name: string; muscle: string; sets: WorkoutSet[] }>;
 }) {
+  const { unit, label } = useWeightUnit();
   if (Object.keys(byExercise).length === 0) {
     return (
       <p className="px-5 py-4 text-sm text-center" style={{ color: "var(--color-text-ghost)" }}>
@@ -426,8 +429,8 @@ function ReadOnlySets({
                   className="font-display flex-1"
                   style={{ color: "var(--color-text-primary)", fontSize: 14 }}
                 >
-                  {s.weight_kg ?? "—"}
-                  <span style={{ color: "var(--color-text-ghost)", fontSize: 12 }}> KG</span>
+                  {s.weight_kg != null ? formatKg(s.weight_kg, unit) : "—"}
+                  <span style={{ color: "var(--color-text-ghost)", fontSize: 12 }}> {label}</span>
                   <span className="mx-2" style={{ color: "var(--color-text-ghost)" }}>×</span>
                   {s.reps ?? "—"}
                 </span>

@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { usePRs } from "@/lib/hooks/use-prs";
 import { formatRelativeDate } from "@fittrack/shared";
+import { useWeightUnit, formatKg } from "@/lib/hooks/use-weight-unit";
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function RecentPRsCard() {
   const { data: prs, isLoading } = usePRs();
+  const { unit, label } = useWeightUnit();
   const recent = (prs ?? []).slice(0, 4);
 
   return (
@@ -66,7 +68,7 @@ export function RecentPRsCard() {
                   </p>
                 </div>
                 <span className="stat-small" style={{ color: "var(--color-text-primary)" }}>
-                  {pr.weight_kg} kg × {pr.reps}
+                  {pr.weight_kg != null ? formatKg(pr.weight_kg, unit) : "—"} {label.toLowerCase()} × {pr.reps}
                 </span>
                 {isFresh && <span className="stamp shrink-0">PR</span>}
               </div>

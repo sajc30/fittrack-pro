@@ -4,10 +4,12 @@ import { useState, useEffect, useMemo } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
+import { useWeightUnit } from "@/lib/hooks/use-weight-unit";
 import { useProfile } from "@/lib/hooks/use-profile";
 import { useMeasurements, useAddMeasurement } from "@/lib/hooks/use-measurements";
 import { calculateTDEE, calculateBMI } from "@fittrack/shared";
 import { format } from "date-fns";
+import { MuscleMapCard } from "./muscle-map";
 
 function kgToLbs(kg: number) { return Math.round(kg * 2.20462 * 10) / 10; }
 function cmToFtIn(cm: number) {
@@ -31,6 +33,7 @@ const AXIS_TICK = {
 } as const;
 
 function WeightTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { date: string; weight: number } }> }) {
+  const { label } = useWeightUnit();
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
   return (
@@ -42,7 +45,7 @@ function WeightTooltip({ active, payload }: { active?: boolean; payload?: Array<
       fontFamily: "var(--font-mono)",
       letterSpacing: "0.06em",
     }}>
-      <p style={{ color: "var(--color-text-primary)", fontSize: 13 }}>{p.weight} KG</p>
+      <p style={{ color: "var(--color-text-primary)", fontSize: 13 }}>{p.weight} {label}</p>
       <p style={{ color: "var(--color-text-secondary)", fontSize: 11, marginTop: 2 }}>{p.date.toUpperCase()}</p>
     </div>
   );
@@ -138,6 +141,9 @@ export function BodyMetricsView() {
 
   return (
     <div className="space-y-6">
+      {/* Muscle activity map */}
+      <MuscleMapCard />
+
       {/* Weight Trend */}
       <div className="sheet p-6">
         <div className="flex items-start justify-between mb-5">
@@ -168,10 +174,18 @@ export function BodyMetricsView() {
           </div>
           <button
             onClick={() => { setShowForm(!showForm); setSaveError(null); }}
-            className="bp-btn-outline"
-            style={{ fontSize: 12 }}
+            className="label-caps transition-colors duration-150 hover:!text-[var(--color-text-primary)]"
+            style={{
+              fontSize: 11,
+              letterSpacing: "0.14em",
+              border: "1px solid var(--color-line)",
+              borderRadius: 2,
+              padding: "4px 10px",
+              backgroundColor: "transparent",
+              cursor: "pointer",
+            }}
           >
-            + LOG
+            + Log
           </button>
         </div>
 

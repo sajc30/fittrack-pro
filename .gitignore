@@ -16,8 +16,8 @@ out
 *.key
 *.mobileprovision
 *.orig.*
-ios/
-android/
+/ios/
+/android/
 
 # Environment
 .env
