@@ -8,7 +8,7 @@ export function StreakCard() {
 
   return (
     <div className="sheet p-5 h-full">
-      <p className="fig-label mb-4">Fig. 1 — Training streak</p>
+      <p className="fig-label mb-4">Training streak</p>
 
       <div className="flex items-end gap-2 mb-4">
         <span

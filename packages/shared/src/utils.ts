@@ -96,20 +96,6 @@ export function calculateStreak(workoutDates: string[]): number {
 }
 
 /**
- * Calculate total weekly volume (sets × reps × weight) from a list of sets.
- */
-export function calculateWeeklyVolume(
-  sets: Array<{ reps: number | null; weight_kg: number | null }>
-): number {
-  return sets.reduce((total, set) => {
-    if (set.reps && set.weight_kg) {
-      return total + set.reps * set.weight_kg;
-    }
-    return total;
-  }, 0);
-}
-
-/**
  * Group an array by a key function.
  */
 export function groupBy<T>(

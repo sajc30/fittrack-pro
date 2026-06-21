@@ -148,7 +148,7 @@ export function BodyMetricsView() {
       <div className="sheet p-6">
         <div className="flex items-start justify-between mb-5">
           <div>
-            <p className="fig-label mb-1.5">Fig. 1 — Weight trend ({wUnit})</p>
+            <p className="fig-label mb-1.5">Weight trend ({wUnit})</p>
             {displayLatestWeight != null ? (
               <div className="flex items-end gap-2">
                 <span
@@ -266,7 +266,7 @@ export function BodyMetricsView() {
       {/* TDEE & Macros */}
       {tdee && (
         <div className="sheet p-6">
-          <p className="fig-label mb-1">Fig. 2 — Daily energy target</p>
+          <p className="fig-label mb-1">Daily energy target</p>
           <p className="label-caps mb-5" style={{ fontSize: 11 }}>
             {profile?.goal?.replace(/_/g, " ").toUpperCase() ?? "MAINTAIN"} · TDEE estimate
           </p>
@@ -322,7 +322,7 @@ export function BodyMetricsView() {
 
       {/* Body stats */}
       <div className="sheet p-6">
-        <p className="fig-label mb-4">Fig. 3 — Body specs</p>
+        <p className="fig-label mb-4">Body specs</p>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-0 divide-x divide-y" style={{ borderColor: "var(--color-line)" }}>
           {[
             { label: "HEIGHT",       value: displayHeight },

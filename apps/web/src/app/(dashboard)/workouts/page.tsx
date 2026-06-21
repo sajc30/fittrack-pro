@@ -11,7 +11,7 @@ export default function WorkoutsPage() {
         style={{ borderColor: "var(--color-line)" }}
       >
         <div>
-          <p className="fig-label mb-1.5">Sht 02 — Workouts</p>
+          <p className="fig-label mb-1.5">Workouts</p>
           <h1 className="text-2xl font-semibold tracking-tight" style={{ color: "var(--color-text-primary)" }}>
             Training log
           </h1>

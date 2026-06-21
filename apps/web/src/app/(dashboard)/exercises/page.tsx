@@ -11,7 +11,7 @@ export default function ExercisesPage() {
         style={{ borderColor: "var(--color-line)" }}
       >
         <div>
-          <p className="fig-label mb-1.5">Sht 05 — Exercises</p>
+          <p className="fig-label mb-1.5">Exercises</p>
           <h1
             className="text-2xl font-semibold tracking-tight"
             style={{ color: "var(--color-text-primary)" }}

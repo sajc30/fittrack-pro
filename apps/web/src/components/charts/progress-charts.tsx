@@ -74,7 +74,7 @@ function StrengthTooltip({ active, payload }: { active?: boolean; payload?: Arra
   );
 }
 
-function VolumeTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { week: string; volume: number } }> }) {
+function SetsTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { week: string; sets: number } }> }) {
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
   return (
@@ -89,7 +89,7 @@ function VolumeTooltip({ active, payload }: { active?: boolean; payload?: Array<
       }}
     >
       <p style={{ color: "var(--color-text-primary)", fontSize: 13 }}>
-        {p.volume} T
+        {p.sets} SET{p.sets !== 1 ? "S" : ""}
       </p>
       <p style={{ color: "var(--color-text-secondary)", fontSize: 11, marginTop: 2 }}>
         WK OF {p.week.toUpperCase()}
@@ -151,10 +151,33 @@ export function ProgressCharts() {
       }));
   }, [strengthData, rangeDate, dateFmt, unit]);
 
-  // Weekly volume — 12-week history
-  const volumeData = useMemo(() => {
+  // Total sets / reps / best set for the selected exercise within range
+  const exerciseStats = useMemo(() => {
+    if (!strengthData) return null;
+    let totalSets = 0;
+    let totalReps = 0;
+    let bestE1rm = 0;
+    let bestWeightKg = 0;
+    let bestReps = 0;
+    for (const s of strengthData) {
+      if (s.weight_kg == null || s.reps == null) continue;
+      if (new Date(s.logged_at) < rangeDate) continue;
+      totalSets += 1;
+      totalReps += s.reps;
+      const e1rm = estimateOneRepMax(s.weight_kg, s.reps);
+      if (e1rm > bestE1rm) {
+        bestE1rm = e1rm;
+        bestWeightKg = s.weight_kg;
+        bestReps = s.reps;
+      }
+    }
+    return totalSets > 0 ? { totalSets, totalReps, bestWeightKg, bestReps } : null;
+  }, [strengthData, rangeDate]);
+
+  // Weekly sets — 12-week history
+  const setsData = useMemo(() => {
     if (!workouts) return [];
-    const weeks: { week: string; volume: number }[] = [];
+    const weeks: { week: string; sets: number }[] = [];
     for (let i = 11; i >= 0; i--) {
       const weekStart = startOfWeek(subWeeks(new Date(), i));
       const weekEnd = endOfWeek(weekStart);
@@ -162,11 +185,11 @@ export function ProgressCharts() {
         const d = new Date(w.started_at);
         return d >= weekStart && d <= weekEnd;
       });
-      const volume = weekWorkouts.reduce((sum, w) => {
-        const sets = (w.workout_sets as Array<{ reps: number | null; weight_kg: number | null }>) ?? [];
-        return sum + sets.reduce((s, set) => s + (set.reps ?? 0) * (set.weight_kg ?? 0), 0);
+      const setCount = weekWorkouts.reduce((sum, w) => {
+        const sets = (w.workout_sets as Array<unknown>) ?? [];
+        return sum + sets.length;
       }, 0);
-      weeks.push({ week: format(weekStart, "MMM d"), volume: Math.round(volume / 100) / 10 });
+      weeks.push({ week: format(weekStart, "MMM d"), sets: setCount });
     }
     return weeks;
   }, [workouts]);
@@ -201,7 +224,7 @@ export function ProgressCharts() {
         <div className="flex flex-col gap-3 mb-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="fig-label mb-1">Fig. 1 — Strength (est. 1RM, {label.toLowerCase()})</p>
+              <p className="fig-label mb-1">Strength (est. 1RM, {label.toLowerCase()})</p>
               <p className="label-caps" style={{ fontSize: 11 }}>
                 Best set per session · <span style={{ color: "var(--color-redline)" }}>◦ record</span>
               </p>
@@ -283,21 +306,43 @@ export function ProgressCharts() {
             </LineChart>
           </ResponsiveContainer>
         )}
+
+        {exerciseStats && (
+          <div
+            className="grid gap-0 divide-x mt-5 pt-5 border-t"
+            style={{ borderColor: "var(--color-line)", gridTemplateColumns: "1fr 1fr 1.6fr" }}
+          >
+            {[
+              { label: "TOTAL SETS", value: String(exerciseStats.totalSets) },
+              { label: "TOTAL REPS", value: String(exerciseStats.totalReps) },
+              { label: "BEST SET", value: `${formatKg(exerciseStats.bestWeightKg, unit)} ${label} × ${exerciseStats.bestReps}` },
+            ].map((stat) => (
+              <div key={stat.label} className="px-4 first:pl-0" style={{ borderColor: "var(--color-line)" }}>
+                <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em", color: "var(--color-text-ghost)", marginBottom: 6, whiteSpace: "nowrap" }}>
+                  {stat.label}
+                </p>
+                <p style={{ fontFamily: "var(--font-mono)", fontSize: 14, fontWeight: 600, color: "var(--color-text-primary)", whiteSpace: "nowrap" }}>
+                  {stat.value}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* FIG. 2 — weekly volume */}
+      {/* FIG. 2 — weekly sets */}
       <div className="sheet p-6">
         <div className="mb-5">
-          <p className="fig-label mb-1">Fig. 2 — Weekly volume (tonnes)</p>
-          <p className="label-caps" style={{ fontSize: 11 }}>Reps × load, 12-week history</p>
+          <p className="fig-label mb-1">Weekly sets</p>
+          <p className="label-caps" style={{ fontSize: 11 }}>Total sets, 12-week history</p>
         </div>
-        {volumeData.every((d) => d.volume === 0) ? (
+        {setsData.every((d) => d.sets === 0) ? (
           <div className="h-48 flex items-center justify-center">
-            <p style={{ color: "var(--color-text-ghost)", fontSize: 14 }}>No tonnage on record yet.</p>
+            <p style={{ color: "var(--color-text-ghost)", fontSize: 14 }}>No sets on record yet.</p>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={volumeData} barCategoryGap="28%" margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
+            <BarChart data={setsData} barCategoryGap="28%" margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
               <defs>
                 <pattern id="bp-bar-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
                   <line x1="0" y1="0" x2="0" y2="6" stroke="var(--color-text-secondary)" strokeWidth="1" opacity="0.5" />
@@ -306,13 +351,13 @@ export function ProgressCharts() {
               <CartesianGrid stroke="var(--color-line)" strokeWidth={0.5} vertical={false} />
               <XAxis dataKey="week" tick={AXIS_TICK} axisLine={{ stroke: "var(--color-line-bright)" }} tickLine={false} />
               <YAxis tick={AXIS_TICK} axisLine={{ stroke: "var(--color-line-bright)" }} tickLine={false} />
-              <Tooltip content={<VolumeTooltip />} cursor={{ fill: "rgba(143, 180, 217, 0.06)" }} />
-              <Bar dataKey="volume" fill="url(#bp-bar-hatch)" radius={[0, 0, 0, 0]}>
-                {volumeData.map((_, i) => (
+              <Tooltip content={<SetsTooltip />} cursor={{ fill: "rgba(143, 180, 217, 0.06)" }} />
+              <Bar dataKey="sets" fill="url(#bp-bar-hatch)" radius={[0, 0, 0, 0]}>
+                {setsData.map((_, i) => (
                   <Cell
                     key={i}
-                    stroke={i === volumeData.length - 1 ? "var(--color-paper)" : "var(--color-line-bright)"}
-                    strokeWidth={i === volumeData.length - 1 ? 1.25 : 1}
+                    stroke={i === setsData.length - 1 ? "var(--color-paper)" : "var(--color-line-bright)"}
+                    strokeWidth={i === setsData.length - 1 ? 1.25 : 1}
                   />
                 ))}
               </Bar>

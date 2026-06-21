@@ -30,7 +30,7 @@ struct ProgressView_: View {
                         pageHeader
                         StrengthCard(selectedExerciseId: $selectedExerciseId, range: $range)
                             .padding(.horizontal, 20)
-                        VolumeHistoryCard()
+                        WeeklySetsCard()
                             .padding(.horizontal, 20)
                         Spacer(minLength: 40)
                     }
@@ -52,13 +52,13 @@ struct ProgressView_: View {
     private var pageHeader: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text("SHT 03 — PROGRESS").figLabel(size: 10)
+                Text("PROGRESS").figLabel(size: 10)
                 Text("Analytics")
                     .font(.system(size: 26, weight: .semibold))
                     .foregroundStyle(Color.bpTextPrimary)
             }
             Spacer()
-            Text("STRENGTH & VOLUME PLOTS").figLabel(size: 9)
+            Text("STRENGTH & SETS PLOTS").figLabel(size: 9)
         }
         .padding(.horizontal, 20)
     }
@@ -78,6 +78,7 @@ private struct StrengthCard: View {
     @Binding var range: ProgressRangeOption
     @AppStorage("settings_weightUnit") private var weightUnit: String = "kg"
     private var unitLabel: String { weightUnit == "lbs" ? "LBS" : "KG" }
+    private func displayWeight(_ kg: Double) -> Double { weightUnit == "lbs" ? kg * 2.20462 : kg }
 
     var body: some View {
         SheetCard {
@@ -93,7 +94,7 @@ private struct StrengthCard: View {
     private var cardHeader: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("FIG. 1 — STRENGTH (EST. 1RM, \(unitLabel))").figLabel(size: 10)
+                Text("STRENGTH (EST. 1RM, \(unitLabel))").figLabel(size: 10)
                 HStack(spacing: 5) {
                     Text("BEST SET PER SESSION")
                         .font(.blueprint(9)).foregroundStyle(Color.bpTextGhost)
@@ -119,8 +120,36 @@ private struct StrengthCard: View {
                 .padding(.vertical, 8)
         } else {
             exercisePicker
-            E1rmChartContent(data: e1rmData)
+            E1rmChartContent(data: e1rmData, displayWeight: displayWeight)
+            if let stats = exerciseStats {
+                Divider().background(Color.bpLine)
+                HStack(spacing: 0) {
+                    StatCell(label: "TOTAL SETS", value: "\(stats.totalSets)")
+                    Divider().frame(height: 32).background(Color.bpLine)
+                    StatCell(label: "TOTAL REPS", value: "\(stats.totalReps)")
+                    Divider().frame(height: 32).background(Color.bpLine)
+                    StatCell(label: "BEST SET", value: "\(String(format: "%.1f", displayWeight(stats.bestWeightKg))) \(unitLabel) × \(stats.bestReps)")
+                }
+            }
         }
+    }
+
+    private var exerciseStats: (totalSets: Int, totalReps: Int, bestWeightKg: Double, bestReps: Int)? {
+        guard let exId = selectedExerciseId else { return nil }
+        let cutoff = rangeDate
+        var totalSets = 0, totalReps = 0
+        var bestE1rm = 0.0, bestWeightKg = 0.0, bestReps = 0
+        for w in workout.workouts {
+            for s in w.workoutSets ?? [] where s.exerciseId == exId {
+                guard let kg = s.weightKg, let reps = s.reps,
+                      w.startedAt >= cutoff, reps > 0 else { continue }
+                totalSets += 1
+                totalReps += reps
+                let e1rm = epley1RM(kg: kg, reps: reps)
+                if e1rm > bestE1rm { bestE1rm = e1rm; bestWeightKg = kg; bestReps = reps }
+            }
+        }
+        return totalSets > 0 ? (totalSets, totalReps, bestWeightKg, bestReps) : nil
     }
 
     private var exercisePicker: some View {
@@ -147,11 +176,11 @@ private struct StrengthCard: View {
             for s in w.workoutSets ?? [] where s.exerciseId == exId {
                 guard let kg = s.weightKg, let reps = s.reps,
                       w.startedAt >= cutoff, reps > 0 else { continue }
-                let e1rm = kg / (1.0278 - 0.0278 * Double(reps))
+                let e1rm = epley1RM(kg: kg, reps: reps)
                 let day  = Calendar.current.startOfDay(for: w.startedAt)
                 let key  = day.timeIntervalSince1970
                 if let cur = byDay[key], cur.e1rm >= e1rm { continue }
-                byDay[key] = E1rmPoint(date: day, e1rm: e1rm, isPR: s.isPr)
+                byDay[key] = E1rmPoint(date: day, e1rm: e1rm, isPR: s.isPr, weightKg: kg, reps: reps)
             }
         }
         return byDay.values.sorted { $0.date < $1.date }
@@ -169,10 +198,15 @@ private struct StrengthCard: View {
     }
 }
 
-struct E1rmPoint { let date: Date; let e1rm: Double; let isPR: Bool }
+struct E1rmPoint { let date: Date; let e1rm: Double; let isPR: Bool; let weightKg: Double; let reps: Int }
+
+private func epley1RM(kg: Double, reps: Int) -> Double {
+    kg / (1.0278 - 0.0278 * Double(reps))
+}
 
 private struct E1rmChartContent: View {
     let data: [E1rmPoint]
+    let displayWeight: (Double) -> Double
 
     var body: some View {
         if data.count < 2 {
@@ -181,10 +215,10 @@ private struct E1rmChartContent: View {
                 .frame(maxWidth: .infinity).padding(.vertical, 40)
         } else {
             Chart(data, id: \.date) { p in
-                LineMark(x: .value("Date", p.date), y: .value("E1RM", p.e1rm))
+                LineMark(x: .value("Date", p.date), y: .value("E1RM", displayWeight(p.e1rm)))
                     .foregroundStyle(Color.bpPaper)
                     .lineStyle(StrokeStyle(lineWidth: 1.5))
-                PointMark(x: .value("Date", p.date), y: .value("E1RM", p.e1rm))
+                PointMark(x: .value("Date", p.date), y: .value("E1RM", displayWeight(p.e1rm)))
                     .foregroundStyle(p.isPR ? Color.bpRedline : Color.bpPaper)
                     .symbolSize(p.isPR ? 36 : 16)
             }
@@ -204,41 +238,41 @@ private struct E1rmChartContent: View {
     }
 }
 
-// MARK: - FIG. 2 — Weekly volume card
+// MARK: - FIG. 2 — Weekly sets card
 
-private struct VolumeHistoryCard: View {
+private struct WeeklySetsCard: View {
     @Environment(WorkoutViewModel.self) private var workout
 
     var body: some View {
         SheetCard {
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("FIG. 2 — WEEKLY VOLUME (T)").figLabel(size: 10)
-                    Text("REPS × LOAD · 12-WEEK HISTORY")
+                    Text("WEEKLY SETS").figLabel(size: 10)
+                    Text("TOTAL SETS · 12-WEEK HISTORY")
                         .font(.blueprint(9)).foregroundStyle(Color.bpTextGhost)
                 }
                 Divider().background(Color.bpLine)
-                volumeContent
+                setsContent
             }
             .padding(18)
         }
     }
 
     @ViewBuilder
-    private var volumeContent: some View {
-        let volData = weeklyVolumeData
-        let maxVol  = volData.map(\.volume).max() ?? 0
-        if maxVol == 0 {
-            Text("No tonnage on record yet.")
+    private var setsContent: some View {
+        let setsData = weeklySetsData
+        let maxCount = setsData.map(\.count).max() ?? 0
+        if maxCount == 0 {
+            Text("No sets on record yet.")
                 .font(.blueprint(12)).foregroundStyle(Color.bpTextGhost)
                 .frame(maxWidth: .infinity).padding(.vertical, 40)
         } else {
-            VolumeBarChart(weeks: volData, maxVolume: maxVol)
+            WeeklyBarChart(weeks: setsData, maxValue: maxCount)
                 .frame(height: 170)
         }
     }
 
-    private var weeklyVolumeData: [WeekBar] {
+    private var weeklySetsData: [WeekBar] {
         let cal = Calendar.current
         let now = Date()
         var result: [WeekBar] = []
@@ -247,16 +281,13 @@ private struct VolumeHistoryCard: View {
             let comps     = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: ref)
             let weekStart = cal.date(from: comps)!
             let nextWeek  = cal.date(byAdding: .weekOfYear, value: 1, to: weekStart)!
-            var vol = 0.0
+            var count = 0
             for w in workout.workouts {
                 guard w.startedAt >= weekStart && w.startedAt < nextWeek else { continue }
-                for s in w.workoutSets ?? [] {
-                    guard let kg = s.weightKg, let r = s.reps else { continue }
-                    vol += kg * Double(r)
-                }
+                count += (w.workoutSets ?? []).count
             }
             let label = weekStart.formatted(.dateTime.month(.abbreviated).day()).uppercased()
-            result.append(WeekBar(label: label, volume: vol / 1000, isCurrent: weeksAgo == 0))
+            result.append(WeekBar(label: label, count: Double(count), isCurrent: weeksAgo == 0))
         }
         return result
     }
@@ -266,15 +297,15 @@ private struct VolumeHistoryCard: View {
 
 struct WeekBar {
     let label: String
-    let volume: Double
+    let count: Double
     let isCurrent: Bool
 }
 
 // MARK: - FIG. 2 hatched bar chart
 
-struct VolumeBarChart: View {
+struct WeeklyBarChart: View {
     let weeks: [WeekBar]
-    let maxVolume: Double
+    let maxValue: Double
 
     var body: some View {
         VStack(spacing: 0) {
@@ -284,7 +315,7 @@ struct VolumeBarChart: View {
                 let chartH = geo.size.height
                 HStack(alignment: .bottom, spacing: spacing) {
                     ForEach(weeks.indices, id: \.self) { i in
-                        SingleBar(d: weeks[i], fraction: maxVolume > 0 ? CGFloat(weeks[i].volume / maxVolume) : 0, chartH: chartH)
+                        SingleBar(d: weeks[i], fraction: maxValue > 0 ? CGFloat(weeks[i].count / maxValue) : 0, chartH: chartH)
                             .frame(width: barW)
                     }
                 }
@@ -316,7 +347,7 @@ private struct SingleBar: View {
     let chartH: CGFloat
 
     var body: some View {
-        let barH = max(chartH * fraction, d.volume > 0 ? 2 : 0)
+        let barH = max(chartH * fraction, d.count > 0 ? 2 : 0)
         VStack(spacing: 0) {
             Spacer(minLength: 0)
             Canvas { ctx, size in

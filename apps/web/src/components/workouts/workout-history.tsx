@@ -457,9 +457,9 @@ function WorkoutCard({ workout, sessionNo }: { workout: Workout; sessionNo: numb
   const [showDeleteConf, setShowDeleteConf] = useState(false);
   const [menuOpen,       setMenuOpen]       = useState(false);
 
-  const sets        = workout.workout_sets;
-  const prCount     = sets.filter((s) => s.is_pr).length;
-  const totalVolume = sets.reduce((sum, s) => sum + (s.reps ?? 0) * (s.weight_kg ?? 0), 0);
+  const sets      = workout.workout_sets;
+  const prCount   = sets.filter((s) => s.is_pr).length;
+  const totalReps = sets.reduce((sum, s) => sum + (s.reps ?? 0), 0);
 
   const byExercise = sets.reduce<Record<string, { name: string; muscle: string; sets: WorkoutSet[] }>>((acc, s) => {
     const id = s.exercise_id;
@@ -632,7 +632,7 @@ function WorkoutCard({ workout, sessionNo }: { workout: Workout; sessionNo: numb
               </span>
             )}
             <span>{sets.length} SET{sets.length !== 1 ? "S" : ""}</span>
-            {totalVolume > 0 && <span>{(totalVolume / 1000).toFixed(1)} T</span>}
+            {totalReps > 0 && <span>{totalReps} REP{totalReps !== 1 ? "S" : ""}</span>}
             {prCount > 0 && (
               <span style={{ color: "var(--color-redline)" }}>
                 {prCount} PR{prCount > 1 ? "S" : ""}

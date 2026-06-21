@@ -11,7 +11,7 @@ export default function ProgressPage() {
         style={{ borderColor: "var(--color-line)" }}
       >
         <div>
-          <p className="fig-label mb-1.5">Sht 03 — Progress</p>
+          <p className="fig-label mb-1.5">Progress</p>
           <h1
             className="text-2xl font-semibold tracking-tight"
             style={{ color: "var(--color-text-primary)" }}
@@ -19,7 +19,7 @@ export default function ProgressPage() {
             Analytics
           </h1>
         </div>
-        <p className="label-caps hidden sm:block">Strength &amp; volume plots</p>
+        <p className="label-caps hidden sm:block">Strength &amp; sets plots</p>
       </div>
       <ProgressCharts />
     </div>

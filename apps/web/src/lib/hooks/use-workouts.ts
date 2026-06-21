@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { calculateStreak, calculateWeeklyVolume } from "@fittrack/shared";
+import { calculateStreak } from "@fittrack/shared";
 
 export function useWorkouts(limit = 50) {
   const supabase = createClient();
@@ -58,14 +58,14 @@ export function useStreak() {
   return calculateStreak((data ?? []).map((w) => w.started_at));
 }
 
-export function useWeeklyVolume() {
+export function useWeeklySets() {
   const supabase = createClient();
 
   return useQuery({
-    queryKey: ["weekly-volume"],
+    queryKey: ["weekly-sets"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return { thisWeek: 0, lastWeek: 0, pct: 0 };
+      if (!user) return { thisWeek: 0, lastWeek: 0 };
 
       const now = new Date();
       const weekStart = new Date(now);
@@ -77,26 +77,22 @@ export function useWeeklyVolume() {
 
       const { data, error } = await supabase
         .from("workout_sets")
-        .select("reps, weight_kg, logged_at, workouts!inner(user_id)")
+        .select("logged_at, workouts!inner(user_id)")
         .eq("workouts.user_id", user.id)
         .gte("logged_at", lastWeekStart.toISOString());
 
       if (error) throw error;
 
-      const thisWeekSets = (data ?? []).filter(
+      const thisWeek = (data ?? []).filter(
         (s) => new Date(s.logged_at) >= weekStart
-      );
-      const lastWeekSets = (data ?? []).filter(
+      ).length;
+      const lastWeek = (data ?? []).filter(
         (s) =>
           new Date(s.logged_at) >= lastWeekStart &&
           new Date(s.logged_at) < weekStart
-      );
+      ).length;
 
-      const thisWeek = calculateWeeklyVolume(thisWeekSets);
-      const lastWeek = calculateWeeklyVolume(lastWeekSets);
-      const pct = lastWeek > 0 ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100) : 0;
-
-      return { thisWeek, lastWeek, pct };
+      return { thisWeek, lastWeek };
     },
   });
 }

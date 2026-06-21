@@ -58,7 +58,7 @@ struct BodyView: View {
                         // Header
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("SHT 04 — BODY").figLabel(size: 10)
+                                Text("BODY").figLabel(size: 10)
                                 Text("Measurements")
                                     .font(.system(size: 26, weight: .semibold))
                                     .foregroundStyle(Color.bpTextPrimary)
@@ -110,7 +110,7 @@ struct BodyView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack {
                                     VStack(alignment: .leading, spacing: 3) {
-                                        Text("FIG. 1 — WEIGHT TREND (\(weightUnit))").figLabel(size: 10)
+                                        Text("WEIGHT TREND (\(weightUnit))").figLabel(size: 10)
                                         if let w = latestWeight {
                                             HStack(alignment: .lastTextBaseline, spacing: 4) {
                                                 Text(displayWeight(w))
@@ -160,7 +160,7 @@ struct BodyView: View {
                         // FIG. 2 Body specs
                         SheetCard {
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("FIG. 2 — BODY SPECS").figLabel(size: 10)
+                                Text("BODY SPECS").figLabel(size: 10)
                                 Divider().background(Color.bpLine)
                                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 0) {
                                     let p = profile.profile

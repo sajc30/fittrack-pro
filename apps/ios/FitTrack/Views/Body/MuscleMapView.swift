@@ -231,7 +231,7 @@ struct MuscleMapView: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
-                    Text("FIG. 3 — MUSCLE ACTIVITY MAP").figLabel(size: 10)
+                    Text("MUSCLE ACTIVITY MAP").figLabel(size: 10)
                     Text(gender == "male" ? "♂ M" : "♀ F")
                         .font(.blueprint(8))
                         .foregroundStyle(Color.bpTextSecondary)

@@ -2,7 +2,7 @@
 
 import { TodayWorkoutCard } from "./today-workout-card";
 import { StreakCard } from "./streak-card";
-import { WeeklyVolumeCard } from "./weekly-volume-card";
+import { WeeklySetsCard } from "./weekly-sets-card";
 import { RecentPRsCard } from "./recent-prs-card";
 import { QuickStatsCard } from "./quick-stats-card";
 import { WeightTrendSparkline } from "./weight-trend-sparkline";
@@ -15,12 +15,12 @@ export function BentoGrid() {
         <TodayWorkoutCard />
       </div>
 
-      {/* Streak + Weekly Volume side by side */}
+      {/* Streak + Weekly Sets side by side */}
       <div className="col-span-12 md:col-span-4">
         <StreakCard />
       </div>
       <div className="col-span-12 md:col-span-4">
-        <WeeklyVolumeCard />
+        <WeeklySetsCard />
       </div>
       <div className="col-span-12 md:col-span-4">
         <WeightTrendSparkline />

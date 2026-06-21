@@ -48,7 +48,7 @@ export function WeightTrendSparkline() {
   return (
     <div className="sheet p-5 h-full">
       <div className="flex items-center justify-between mb-4">
-        <p className="fig-label">Fig. 3 — Bodyweight</p>
+        <p className="fig-label">Bodyweight</p>
         {diff !== null && diff !== 0 && (
           <span
             className="font-display"
@@ -67,7 +67,7 @@ export function WeightTrendSparkline() {
         <div className="skeleton h-10 w-20 mb-2" />
       ) : latest === null ? (
         <p className="text-sm mt-2" style={{ color: "var(--color-text-ghost)" }}>
-          Log your weight on Sht 04 — Body to plot the curve.
+          Log your weight on Body to plot the curve.
         </p>
       ) : (
         <>

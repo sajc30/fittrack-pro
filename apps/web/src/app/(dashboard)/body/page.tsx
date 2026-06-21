@@ -11,7 +11,7 @@ export default function BodyPage() {
         style={{ borderColor: "var(--color-line)" }}
       >
         <div>
-          <p className="fig-label mb-1.5">Sht 04 — Body</p>
+          <p className="fig-label mb-1.5">Body</p>
           <h1
             className="text-2xl font-semibold tracking-tight"
             style={{ color: "var(--color-text-primary)" }}

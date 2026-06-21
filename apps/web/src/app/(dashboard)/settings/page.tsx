@@ -11,7 +11,7 @@ export default function SettingsPage() {
         style={{ borderColor: "var(--color-line)" }}
       >
         <div>
-          <p className="fig-label mb-1.5">Sht 06 — Settings</p>
+          <p className="fig-label mb-1.5">Settings</p>
           <h1
             className="text-2xl font-semibold tracking-tight"
             style={{ color: "var(--color-text-primary)" }}

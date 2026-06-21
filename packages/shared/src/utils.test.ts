@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateStreak,
-  calculateWeeklyVolume,
   clamp,
   formatDuration,
   formatWeight,
@@ -57,27 +56,6 @@ describe("calculateStreak", () => {
     expect(
       calculateStreak([daysAgoAt(0, 8), daysAgoAt(0, 19), daysAgoAt(1, 8)])
     ).toBe(2);
-  });
-});
-
-describe("calculateWeeklyVolume", () => {
-  it("sums reps × weight", () => {
-    expect(
-      calculateWeeklyVolume([
-        { reps: 5, weight_kg: 100 },
-        { reps: 10, weight_kg: 50 },
-      ])
-    ).toBe(1000);
-  });
-
-  it("skips sets with null reps or weight", () => {
-    expect(
-      calculateWeeklyVolume([
-        { reps: null, weight_kg: 100 },
-        { reps: 5, weight_kg: null },
-        { reps: 2, weight_kg: 60 },
-      ])
-    ).toBe(120);
   });
 });
 

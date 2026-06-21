@@ -166,6 +166,8 @@ struct BPChip: View {
             Text(label)
                 .font(.blueprint(10, weight: .medium))
                 .tracking(1.5)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 .background(isActive ? Color.bpPaper : Color.clear)

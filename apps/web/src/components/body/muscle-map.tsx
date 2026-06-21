@@ -157,7 +157,7 @@ export function MuscleMapCard() {
       <div className="flex flex-wrap items-start justify-between gap-y-3 mb-3">
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <p className="fig-label">Fig. 3 — Muscle activity map</p>
+            <p className="fig-label">Muscle activity map</p>
             <span
               style={{
                 fontFamily: "var(--font-mono)",

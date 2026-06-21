@@ -15,7 +15,7 @@ export function RecentPRsCard() {
   return (
     <div className="sheet p-5 h-full">
       <div className="flex items-center justify-between mb-4">
-        <p className="fig-label">Fig. 4 — Revision history · personal records</p>
+        <p className="fig-label">Revision history · personal records</p>
         <Link
           href="/progress"
           className="label-caps transition-colors duration-150 hover:!text-[var(--color-text-primary)]"

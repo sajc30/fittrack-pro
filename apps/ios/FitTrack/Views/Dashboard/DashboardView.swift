@@ -27,22 +27,19 @@ struct DashboardView: View {
         return count
     }
 
-    private var weeklyVolume: (thisWeek: Double, lastWeek: Double, pct: Int) {
+    private var weeklySets: (thisWeek: Int, lastWeek: Int) {
         let cal = Calendar.current
         let now = Date()
         let weekStart = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now))!
         let lastWeekStart = cal.date(byAdding: .weekOfYear, value: -1, to: weekStart)!
-        var thisWeek = 0.0, lastWeek = 0.0
+        var thisWeek = 0, lastWeek = 0
         for w in workout.workouts {
             for s in w.workoutSets ?? [] {
-                guard let kg = s.weightKg, let r = s.reps else { continue }
-                let vol = kg * Double(r)
-                if s.loggedAt >= weekStart { thisWeek += vol }
-                else if s.loggedAt >= lastWeekStart { lastWeek += vol }
+                if s.loggedAt >= weekStart { thisWeek += 1 }
+                else if s.loggedAt >= lastWeekStart { lastWeek += 1 }
             }
         }
-        let pct = lastWeek > 0 ? Int(((thisWeek - lastWeek) / lastWeek * 100).rounded()) : 0
-        return (thisWeek, lastWeek, pct)
+        return (thisWeek, lastWeek)
     }
 
     private func relativeDate(_ date: Date) -> String {
@@ -71,7 +68,7 @@ struct DashboardView: View {
                         // Page header
                         HStack(alignment: .top) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("SHT 01 — DASHBOARD").figLabel(size: 10)
+                                Text("DASHBOARD").figLabel(size: 10)
                                 Text(greeting)
                                     .font(.system(size: 26, weight: .semibold))
                                     .foregroundStyle(Color.bpTextPrimary)
@@ -116,12 +113,12 @@ struct DashboardView: View {
 
                         // Streak + Weekly Volume side by side
                         let s = streak
-                        let vol = weeklyVolume
+                        let sets = weeklySets
                         HStack(alignment: .top, spacing: 12) {
                             // FIG. 1 — Streak
                             SheetCard {
                                 VStack(alignment: .leading, spacing: 10) {
-                                    Text("FIG. 1 — STREAK").figLabel(size: 10)
+                                    Text("STREAK").figLabel(size: 10)
                                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                                         Text("\(s)")
                                             .font(.system(size: 30, weight: .semibold))
@@ -152,27 +149,27 @@ struct DashboardView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
 
-                            // FIG. 2 — Weekly Volume
+                            // FIG. 2 — Weekly Sets
                             SheetCard {
                                 VStack(alignment: .leading, spacing: 10) {
-                                    Text("FIG. 2 — VOLUME").figLabel(size: 10)
-                                    if vol.thisWeek > 0 {
+                                    Text("SETS").figLabel(size: 10)
+                                    if sets.thisWeek > 0 {
                                         HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                            Text(String(format: "%.1f", vol.thisWeek / 1000))
+                                            Text("\(sets.thisWeek)")
                                                 .font(.system(size: 30, weight: .semibold))
                                                 .foregroundStyle(Color.bpTextPrimary)
-                                            Text("T").figLabel(size: 9)
+                                            Text("SETS").figLabel(size: 9)
                                         }
-                                        let pct = vol.pct
-                                        Text(vol.lastWeek == 0
+                                        let delta = sets.thisWeek - sets.lastWeek
+                                        Text(sets.lastWeek == 0
                                              ? "FIRST WEEK"
-                                             : "Δ \(pct >= 0 ? "+" : "")\(pct)% VS LAST WK")
+                                             : "Δ \(delta >= 0 ? "+" : "")\(delta) VS LAST WK")
                                             .font(.blueprint(9))
                                             .foregroundStyle(
-                                                vol.lastWeek == 0 ? Color.bpTextGhost
-                                                : pct >= 0 ? Color.bpPaper : Color.bpRedline
+                                                sets.lastWeek == 0 ? Color.bpTextGhost
+                                                : delta >= 0 ? Color.bpPaper : Color.bpRedline
                                             )
-                                        Text("REPS × LOAD").figLabel(size: 8).foregroundStyle(Color.bpTextGhost)
+                                        Text("THIS WEEK").figLabel(size: 8).foregroundStyle(Color.bpTextGhost)
                                     } else {
                                         Text("No sets logged\nthis week.")
                                             .font(.blueprint(11))
@@ -190,7 +187,7 @@ struct DashboardView: View {
                         if !workout.personalRecords.isEmpty {
                             SheetCard {
                                 VStack(alignment: .leading, spacing: 12) {
-                                    Text("FIG. 3 — RECENT RECORDS").figLabel(size: 10)
+                                    Text("RECENT RECORDS").figLabel(size: 10)
                                     Divider().background(Color.bpLine)
                                     ForEach(workout.personalRecords.prefix(4)) { pr in
                                         HStack {
@@ -225,7 +222,7 @@ struct DashboardView: View {
                             SheetCard {
                                 VStack(alignment: .leading, spacing: 12) {
                                     HStack {
-                                        Text("FIG. 4 — BODYWEIGHT").figLabel(size: 10)
+                                        Text("BODYWEIGHT").figLabel(size: 10)
                                         Spacer()
                                         if let w = latestWeight {
                                             Text(String(format: "%.1f \(unitLabel)", displayWeight(w)))

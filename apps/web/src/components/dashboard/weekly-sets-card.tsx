@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useWeeklyVolume } from "@/lib/hooks/use-workouts";
+import { useWeeklySets } from "@/lib/hooks/use-workouts";
 
 /** Animate a number from 0 to its target, like a dial settling on a measurement. */
 function useCountUp(target: number, durationMs = 900): number {
@@ -24,19 +24,19 @@ function useCountUp(target: number, durationMs = 900): number {
   return value;
 }
 
-export function WeeklyVolumeCard() {
-  const { data, isLoading } = useWeeklyVolume();
+export function WeeklySetsCard() {
+  const { data, isLoading } = useWeeklySets();
   const thisWeek = data?.thisWeek ?? 0;
   const lastWeek = data?.lastWeek ?? 0;
-  const pct = data?.pct ?? 0;
-  const isUp = pct > 0;
-  const isSame = pct === 0;
+  const delta = thisWeek - lastWeek;
+  const isUp = delta > 0;
+  const isSame = delta === 0;
   const noBaseline = lastWeek === 0;
   const animated = useCountUp(thisWeek);
 
   return (
     <div className="sheet p-5 h-full">
-      <p className="fig-label mb-4">Fig. 2 — Weekly volume</p>
+      <p className="fig-label mb-4">Weekly sets</p>
 
       {isLoading ? (
         <div className="skeleton h-10 w-24 mb-2" />
@@ -48,9 +48,9 @@ export function WeeklyVolumeCard() {
         <>
           <div className="flex items-end gap-2 mb-4">
             <span className="stat-large" style={{ color: "var(--color-text-primary)" }}>
-              {(animated / 1000).toFixed(1)}
+              {Math.round(animated)}
             </span>
-            <span className="label-caps mb-1">tonnes</span>
+            <span className="label-caps mb-1">sets</span>
           </div>
 
           <p
@@ -68,11 +68,11 @@ export function WeeklyVolumeCard() {
             {noBaseline
               ? "FIRST WEEK ON RECORD"
               : isSame
-                ? "Δ ±0% VS LAST WK"
-                : `Δ ${isUp ? "+" : ""}${pct}% VS LAST WK`}
+                ? "Δ ±0 VS LAST WK"
+                : `Δ ${isUp ? "+" : ""}${delta} VS LAST WK`}
           </p>
           <p className="label-caps mt-1" style={{ fontSize: 11 }}>
-            Reps × load, all sets
+            All exercises
           </p>
         </>
       )}

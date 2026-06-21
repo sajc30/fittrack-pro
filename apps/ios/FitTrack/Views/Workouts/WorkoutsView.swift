@@ -16,7 +16,7 @@ struct WorkoutsView: View {
                         // Header
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("SHT 02 — WORKOUTS").figLabel(size: 10)
+                                Text("WORKOUTS").figLabel(size: 10)
                                 Text("Session Log")
                                     .font(.system(size: 26, weight: .semibold))
                                     .foregroundStyle(Color.bpTextPrimary)
@@ -61,8 +61,13 @@ struct WorkoutsView: View {
                             .padding(.horizontal, 20)
                         } else {
                             ForEach(Array(workout.workouts.enumerated()), id: \.element.id) { i, w in
-                                SessionCard(workout: w, sessionNumber: workout.workouts.count - i)
-                                    .padding(.horizontal, 20)
+                                NavigationLink {
+                                    WorkoutDetailView(workout: w, sessionNumber: workout.workouts.count - i)
+                                } label: {
+                                    SessionCard(workout: w, sessionNumber: workout.workouts.count - i)
+                                }
+                                .buttonStyle(.plain)
+                                .padding(.horizontal, 20)
                             }
                         }
 
@@ -89,8 +94,8 @@ struct SessionCard: View {
     private var exerciseCount: Int {
         Set(sets.map { $0.exerciseId }).count
     }
-    private var totalVolume: Double {
-        sets.reduce(0) { $0 + (($1.weightKg ?? 0) * Double($1.reps ?? 0)) }
+    private var totalReps: Int {
+        sets.reduce(0) { $0 + ($1.reps ?? 0) }
     }
     private var hasPR: Bool { sets.contains { $0.isPr } }
 
@@ -119,7 +124,7 @@ struct SessionCard: View {
                     Divider().frame(height: 32).background(Color.bpLine)
                     StatCell(label: "SETS", value: "\(sets.count)")
                     Divider().frame(height: 32).background(Color.bpLine)
-                    StatCell(label: "VOLUME", value: String(format: "%.1f T", totalVolume / 1000))
+                    StatCell(label: "REPS", value: "\(totalReps)")
                 }
             }
             .padding(16)
@@ -137,6 +142,8 @@ struct StatCell: View {
             Text(value)
                 .font(.blueprint(15, weight: .semibold))
                 .foregroundStyle(Color.bpTextPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity)
     }

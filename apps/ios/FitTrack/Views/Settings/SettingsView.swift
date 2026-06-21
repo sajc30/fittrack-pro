@@ -54,7 +54,7 @@ struct SettingsView: View {
                         // Header
                         HStack(alignment: .top) {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("SHT 06 — SETTINGS").figLabel(size: 10)
+                                Text("SETTINGS").figLabel(size: 10)
                                 Text("Configuration")
                                     .font(.system(size: 26, weight: .semibold))
                                     .foregroundStyle(Color.bpTextPrimary)
@@ -144,6 +144,7 @@ struct SettingsView: View {
                                         }
                                         useImperialWeight = false
                                         UserDefaults.standard.set(false, forKey: "settings_imperialWeight")
+                                        UserDefaults.standard.set("kg", forKey: "settings_weightUnit")
                                     }
                                     BPChip(label: "LBS", isActive: useImperialWeight) {
                                         if !useImperialWeight, let kg = Double(weightKg) {
@@ -151,6 +152,7 @@ struct SettingsView: View {
                                         }
                                         useImperialWeight = true
                                         UserDefaults.standard.set(true, forKey: "settings_imperialWeight")
+                                        UserDefaults.standard.set("lbs", forKey: "settings_weightUnit")
                                     }
                                 }
                                 BPTextField(
@@ -233,7 +235,10 @@ struct SettingsView: View {
             Button("Sign Out", role: .destructive) { Task { try? await auth.signOut() } }
             Button("Cancel", role: .cancel) {}
         }
-        .onAppear { prefillFromProfile() }
+        .onAppear {
+            prefillFromProfile()
+            UserDefaults.standard.set(useImperialWeight ? "lbs" : "kg", forKey: "settings_weightUnit")
+        }
         .onChange(of: profile.profile) { _, _ in prefillFromProfile() }
     }
 

@@ -31,7 +31,7 @@ struct ExercisesView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("SHT 05 — EXERCISES").figLabel(size: 10)
+                                Text("EXERCISES").figLabel(size: 10)
                                 Text("Exercise Index")
                                     .font(.system(size: 26, weight: .semibold))
                                     .foregroundStyle(Color.bpTextPrimary)
