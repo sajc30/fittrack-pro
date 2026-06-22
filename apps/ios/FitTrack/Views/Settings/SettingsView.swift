@@ -211,16 +211,34 @@ struct SettingsView: View {
 
                         // Spec D — Account
                         SpecSection(fig: "SPEC D — ACCOUNT") {
-                            Button { showSignOutConfirm = true } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "rectangle.portrait.and.arrow.right")
-                                        .font(.system(size: 13))
-                                    Text("SIGN OUT")
-                                        .font(.blueprint(11, weight: .medium)).tracking(2)
+                            HStack(spacing: 10) {
+                                Button { showSignOutConfirm = true } label: {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                                            .font(.system(size: 13))
+                                        Text("SIGN OUT")
+                                            .font(.blueprint(11, weight: .medium)).tracking(2)
+                                    }
+                                    .foregroundStyle(Color.bpRedline)
+                                    .padding(.horizontal, 14).padding(.vertical, 10)
+                                    .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpRedline.opacity(0.5), lineWidth: 1))
                                 }
-                                .foregroundStyle(Color.bpRedline)
-                                .padding(.horizontal, 14).padding(.vertical, 10)
-                                .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpRedline.opacity(0.5), lineWidth: 1))
+
+                                Link(destination: URL(string: "https://fittrack-pro-web-nine.vercel.app/support")!) {
+                                    Text("SUPPORT")
+                                        .font(.blueprint(11, weight: .medium)).tracking(2)
+                                        .foregroundStyle(Color.bpTextSecondary)
+                                        .padding(.horizontal, 14).padding(.vertical, 10)
+                                        .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLine, lineWidth: 1))
+                                }
+
+                                Link(destination: URL(string: "https://fittrack-pro-web-nine.vercel.app/privacy")!) {
+                                    Text("PRIVACY")
+                                        .font(.blueprint(11, weight: .medium)).tracking(2)
+                                        .foregroundStyle(Color.bpTextSecondary)
+                                        .padding(.horizontal, 14).padding(.vertical, 10)
+                                        .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLine, lineWidth: 1))
+                                }
                             }
                         }
 

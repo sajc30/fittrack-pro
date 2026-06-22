@@ -24,6 +24,14 @@ export default function SupportPage() {
       style={{ backgroundColor: "var(--color-ink)" }}
     >
       <div className="max-w-2xl mx-auto">
+        <a
+          href="/dashboard"
+          className="inline-block mb-6 label-caps"
+          style={{ fontSize: 12, color: "var(--color-text-ghost)" }}
+        >
+          ← Back to Iron Blueprint
+        </a>
+
         <div className="mb-10">
           <p className="fig-label mb-1.5">Sht 08 — Support</p>
           <h1

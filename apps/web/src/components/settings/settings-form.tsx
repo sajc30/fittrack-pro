@@ -355,24 +355,52 @@ export function SettingsForm() {
         <div className="pb-3 mb-4 border-b" style={{ borderColor: "var(--color-line)" }}>
           <p className="fig-label" style={{ fontSize: 11 }}>Spec D — Account</p>
         </div>
-        <button
-          onClick={handleSignOut}
-          className="flex items-center gap-2 px-4 py-2.5 font-display uppercase transition-all duration-150"
-          style={{
-            fontSize: 11,
-            letterSpacing: "0.08em",
-            borderRadius: 2,
-            color: "var(--color-redline)",
-            border: "1px solid rgba(220,38,38,0.3)",
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-          SIGN OUT
-        </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-2 px-4 py-2.5 font-display uppercase transition-all duration-150"
+            style={{
+              fontSize: 11,
+              letterSpacing: "0.08em",
+              borderRadius: 2,
+              color: "var(--color-redline)",
+              border: "1px solid rgba(220,38,38,0.3)",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            SIGN OUT
+          </button>
+          <a
+            href="/support"
+            className="px-4 py-2.5 font-display uppercase transition-all duration-150"
+            style={{
+              fontSize: 11,
+              letterSpacing: "0.08em",
+              borderRadius: 2,
+              color: "var(--color-text-secondary)",
+              border: "1px solid var(--color-line)",
+            }}
+          >
+            SUPPORT
+          </a>
+          <a
+            href="/privacy"
+            className="px-4 py-2.5 font-display uppercase transition-all duration-150"
+            style={{
+              fontSize: 11,
+              letterSpacing: "0.08em",
+              borderRadius: 2,
+              color: "var(--color-text-secondary)",
+              border: "1px solid var(--color-line)",
+            }}
+          >
+            PRIVACY POLICY
+          </a>
+        </div>
       </div>
     </div>
   );
