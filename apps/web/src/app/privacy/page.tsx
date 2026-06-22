@@ -127,10 +127,10 @@ export default function PrivacyPage() {
             <p>
               Questions about this policy or your data?{" "}
               <a
-                href="mailto:TODO@example.com"
+                href="mailto:ironblueprint6@gmail.com"
                 style={{ color: "var(--color-text-primary)", textDecoration: "underline" }}
               >
-                TODO@example.com
+                ironblueprint6@gmail.com
               </a>
             </p>
           </section>

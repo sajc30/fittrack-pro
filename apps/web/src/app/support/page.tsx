@@ -47,11 +47,11 @@ export default function SupportPage() {
           </p>
           <p className="mt-4">
             <a
-              href="mailto:TODO@example.com"
+              href="mailto:ironblueprint6@gmail.com"
               className="font-display font-semibold"
               style={{ color: "var(--color-text-primary)", fontSize: 18, textDecoration: "underline" }}
             >
-              TODO@example.com
+              ironblueprint6@gmail.com
             </a>
           </p>
         </div>
