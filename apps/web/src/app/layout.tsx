@@ -6,8 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 export const metadata: Metadata = {
   title: {
-    default: "FitTrack Pro",
-    template: "%s — FitTrack Pro",
+    default: "Iron Blueprint",
+    template: "%s — Iron Blueprint",
   },
   description:
     "The serious athlete's training companion. Track workouts, visualize progress, and dominate your goals.",

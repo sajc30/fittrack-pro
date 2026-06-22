@@ -28,7 +28,7 @@ export function Sidebar() {
           className="font-display font-semibold"
           style={{ color: "var(--color-text-primary)", fontSize: 15, letterSpacing: "0.22em" }}
         >
-          FITTRACK
+          IRON BLUEPRINT
         </p>
         <p className="label-caps mt-1" style={{ fontSize: 11 }}>
           Personal training log

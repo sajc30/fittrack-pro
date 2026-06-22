@@ -12,7 +12,7 @@ struct AuthView: View {
                 VStack(spacing: 32) {
                     // Wordmark
                     VStack(spacing: 6) {
-                        Text("FITTRACK")
+                        Text("IRON BLUEPRINT")
                             .font(.blueprint(22, weight: .bold))
                             .foregroundStyle(Color.bpTextPrimary)
                             .tracking(8)

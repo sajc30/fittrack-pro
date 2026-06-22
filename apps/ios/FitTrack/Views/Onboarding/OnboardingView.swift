@@ -44,7 +44,7 @@ struct OnboardingView: View {
                 VStack(spacing: 24) {
                     // Header
                     VStack(spacing: 6) {
-                        Text("FITTRACK").font(.blueprint(20, weight: .bold))
+                        Text("IRON BLUEPRINT").font(.blueprint(20, weight: .bold))
                             .foregroundStyle(Color.bpTextPrimary).tracking(8)
                         Text("NEW SESSION — COMPLETE YOUR SPEC SHEET")
                             .figLabel(size: 9)

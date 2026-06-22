@@ -31,7 +31,7 @@ export async function updateSession(request: NextRequest) {
   const isAuthRoute      = path.startsWith("/auth");
   const isSignOut        = path === "/auth/signout";
   const isOnboarding     = path === "/onboarding";
-  const isPublicRoute    = path === "/" || isAuthRoute;
+  const isPublicRoute    = path === "/" || isAuthRoute || path === "/privacy" || path === "/support";
   const isApiRoute       = path.startsWith("/api");
 
   // Unauthenticated — redirect to login

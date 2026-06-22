@@ -28,7 +28,7 @@ export default async function OnboardingPage() {
           className="font-display font-bold tracking-[0.25em] uppercase mb-1"
           style={{ fontSize: 22, color: "var(--color-text-primary)" }}
         >
-          FITTRACK
+          IRON BLUEPRINT
         </p>
         <p className="fig-label" style={{ fontSize: 11 }}>PERSONAL TRAINING LOG</p>
       </div>

@@ -16,7 +16,7 @@ export default function LoginPage() {
             letterSpacing: "0.28em",
           }}
         >
-          FITTRACK
+          IRON BLUEPRINT
         </p>
         <p className="label-caps mt-1.5">Personal training log</p>
       </div>

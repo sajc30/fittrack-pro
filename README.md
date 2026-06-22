@@ -1,4 +1,4 @@
-# FitTrack Pro
+# Iron Blueprint
 
 A serious gym tracking app. Web dashboard + iOS companion. Built as a Turborepo monorepo.
 

@@ -11,7 +11,7 @@ struct ContentView: View {
                     Color.bpInk.ignoresSafeArea()
                     DraftingGrid().ignoresSafeArea().opacity(0.6)
                     VStack(spacing: 6) {
-                        Text("FITTRACK")
+                        Text("IRON BLUEPRINT")
                             .font(.blueprint(24, weight: .bold))
                             .foregroundStyle(Color.bpTextPrimary)
                             .tracking(8)
