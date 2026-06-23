@@ -79,7 +79,19 @@ struct BodyView: View {
                         if showLogWeight {
                             SheetCard {
                                 VStack(alignment: .leading, spacing: 12) {
-                                    Text("NEW ENTRY — WEIGHT (\(weightUnit))").figLabel(size: 10)
+                                    HStack {
+                                        Text("NEW ENTRY — WEIGHT (\(weightUnit))").figLabel(size: 10)
+                                        Spacer()
+                                        Button {
+                                            showLogWeight = false
+                                            saveError = nil
+                                            weightInput = ""
+                                        } label: {
+                                            Image(systemName: "xmark")
+                                                .font(.system(size: 13))
+                                                .foregroundStyle(Color.bpTextSecondary)
+                                        }
+                                    }
                                     HStack(spacing: 8) {
                                         BPChip(label: "KG",  isActive: !imperialWeight) { imperialWeight = false }
                                         BPChip(label: "LBS", isActive: imperialWeight)  { imperialWeight = true  }
@@ -186,6 +198,7 @@ struct BodyView: View {
             }
             .navigationBarHidden(true)
         }
+        .dismissesKeyboardOnTap()
         .onAppear {
             imperialWeight = UserDefaults.standard.bool(forKey: "settings_imperialWeight")
             imperialHeight = UserDefaults.standard.bool(forKey: "settings_imperialHeight")

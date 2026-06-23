@@ -271,6 +271,7 @@ struct SettingsView: View {
             }
             .navigationBarHidden(true)
         }
+        .dismissesKeyboardOnTap()
         .confirmationDialog("SIGN OUT?", isPresented: $showSignOutConfirm, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) { Task { try? await auth.signOut() } }
             Button("Cancel", role: .cancel) {}

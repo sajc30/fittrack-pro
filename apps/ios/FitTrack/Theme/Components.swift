@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // ── Blueprint Sheet Card ────────────────────────────────────────────
 struct SheetCard<Content: View>: View {
@@ -197,5 +198,18 @@ struct Stamp: View {
                     .stroke(Color.bpRedline.opacity(0.7), lineWidth: 1.5)
             )
             .rotationEffect(.degrees(-12))
+    }
+}
+
+// ── Keyboard dismissal ───────────────────────────────────────────────
+// .decimalPad / .numberPad have no Return key, so without this a numeric
+// field's keyboard has no way to close once it's up.
+extension View {
+    func dismissesKeyboardOnTap() -> some View {
+        simultaneousGesture(
+            TapGesture().onEnded {
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            }
+        )
     }
 }

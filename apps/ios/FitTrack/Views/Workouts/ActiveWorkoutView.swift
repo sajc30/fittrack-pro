@@ -179,6 +179,7 @@ struct ActiveWorkoutView: View {
         .sheet(isPresented: $showExercisePicker) {
             ExercisePickerSheet(selected: $selectedExercise)
         }
+        .dismissesKeyboardOnTap()
         .confirmationDialog("VOID SESSION?", isPresented: $showVoidConfirm, titleVisibility: .visible) {
             Button("Void & Delete", role: .destructive) { voidWorkout() }
             Button("Cancel", role: .cancel) {}

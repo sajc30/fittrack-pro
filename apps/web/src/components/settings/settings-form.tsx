@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useProfile, useUpdateProfile } from "@/lib/hooks/use-profile";
+import { useMeasurements, useAddMeasurement } from "@/lib/hooks/use-measurements";
 import { createClient } from "@/lib/supabase/client";
 import { DobPicker } from "@/components/ui/dob-picker";
 import { HeightInput } from "@/components/ui/height-input";
@@ -90,6 +91,8 @@ export function SettingsForm() {
   const router = useRouter();
   const { data: profile, isLoading } = useProfile();
   const updateProfile = useUpdateProfile();
+  const { data: measurements } = useMeasurements();
+  const addMeasurement = useAddMeasurement();
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting,        setIsDeleting]        = useState(false);
@@ -130,7 +133,9 @@ export function SettingsForm() {
       setDob(profile.date_of_birth ?? "");
       setGender((profile.gender as Gender) ?? "");
       setHeight(String(profile.height_cm ?? ""));
-      const kg = profile.weight_kg ?? 0;
+      // The measurement log is the source of truth for "current" weight once one exists;
+      // the profile field is only the fallback for accounts with no logged entries yet.
+      const kg = measurements?.[0]?.weight_kg ?? profile.weight_kg ?? 0;
       setWeight(
         kg
           ? weightUnitRef.current === "lbs"
@@ -141,7 +146,7 @@ export function SettingsForm() {
       setActivity((profile.activity_level as ActivityLevel) ?? "moderately_active");
       setGoal((profile.goal as FitnessGoal) ?? "build_muscle");
     }
-  }, [profile]);
+  }, [profile, measurements]);
 
   function handleWeightUnitChange(unit: string) {
     const u = unit as "kg" | "lbs";
@@ -161,7 +166,11 @@ export function SettingsForm() {
     if (!profile) return;
     setSaveError(null);
     const rawWeight = parseFloat(weight);
-    const weightKg  = weightUnit === "lbs" ? rawWeight / 2.20462 : rawWeight;
+    const weightKg  = rawWeight ? Math.round((weightUnit === "lbs" ? rawWeight / 2.20462 : rawWeight) * 10) / 10 : null;
+    const currentKnownWeightKg = measurements?.[0]?.weight_kg ?? profile.weight_kg ?? null;
+    const weightChanged = weightKg !== null &&
+      (currentKnownWeightKg === null || Math.abs(weightKg - currentKnownWeightKg) > 0.05);
+
     try {
       await updateProfile.mutateAsync({
         user_id:        profile.user_id,
@@ -169,10 +178,14 @@ export function SettingsForm() {
         date_of_birth:  dob || null,
         gender:         (gender as Gender) || null,
         height_cm:      parseFloat(height) || null,
-        weight_kg:      rawWeight ? Math.round(weightKg * 10) / 10 : null,
         activity_level: activity,
         goal,
       });
+      // Logging a measurement (rather than patching profiles directly) keeps Settings
+      // and the Body/Dashboard weight log on the same timeline, see use-measurements.ts.
+      if (weightChanged && weightKg !== null) {
+        await addMeasurement.mutateAsync({ weight_kg: weightKg, measured_at: new Date().toISOString() });
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {

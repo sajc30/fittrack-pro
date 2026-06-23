@@ -108,6 +108,7 @@ struct OnboardingView: View {
                 }
             }
         }
+        .dismissesKeyboardOnTap()
     }
 
     private var stepSubtitle: String {

@@ -77,6 +77,7 @@ export function OnboardingWizard({ userId, existingName }: { userId: string; exi
     const supabase = createClient();
     let weightKg = parseFloat(weightVal);
     if (unit === "imperial") weightKg = weightKg / 2.20462;
+    const roundedWeightKg = Math.round(weightKg * 10) / 10;
 
     const { error: err } = await supabase
       .from("profiles")
@@ -85,7 +86,7 @@ export function OnboardingWizard({ userId, existingName }: { userId: string; exi
         date_of_birth: dob,
         gender: gender as Gender,
         height_cm: Math.round(parseFloat(heightCm) * 10) / 10,
-        weight_kg: Math.round(weightKg * 10) / 10,
+        weight_kg: roundedWeightKg,
         activity_level: activity,
         goal,
         updated_at: new Date().toISOString(),
@@ -94,6 +95,18 @@ export function OnboardingWizard({ userId, existingName }: { userId: string; exi
 
     if (err) {
       setError(err.message);
+      setSaving(false);
+      return;
+    }
+
+    // Seed the weight log so the Dashboard/Body trend has a starting point —
+    // the same timeline Settings and Body's "+ Log" both write to later.
+    const { error: measErr } = await supabase
+      .from("body_measurements")
+      .insert({ user_id: userId, weight_kg: roundedWeightKg, measured_at: new Date().toISOString() });
+
+    if (measErr) {
+      setError(measErr.message);
       setSaving(false);
       return;
     }

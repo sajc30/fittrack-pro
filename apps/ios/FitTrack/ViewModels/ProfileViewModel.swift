@@ -49,7 +49,9 @@ final class ProfileViewModel {
         }
     }
 
-    func logWeight(_ kg: Double, userId: UUID) async throws {
+    // Weight is a single timeline shared by Settings and the Body log — every new
+    // entry, wherever it's added, becomes the profile's current weight too.
+    private func setWeight(_ kg: Double, userId: UUID) async throws {
         let measurement: BodyMeasurement = try await supabase
             .from("body_measurements")
             .insert([
@@ -62,6 +64,17 @@ final class ProfileViewModel {
             .execute()
             .value
         measurements.insert(measurement, at: 0)
+
+        try await supabase
+            .from("profiles")
+            .update(["weight_kg": String(kg)])
+            .eq("user_id", value: userId.uuidString)
+            .execute()
+    }
+
+    func logWeight(_ kg: Double, userId: UUID) async throws {
+        try await setWeight(kg, userId: userId)
+        await load(userId: userId)
     }
 
     func save(userId: UUID, name: String, dob: String?, gender: String?,
@@ -70,7 +83,6 @@ final class ProfileViewModel {
         if let v = dob          { patch["date_of_birth"]   = v }
         if let v = gender       { patch["gender"]           = v }
         if let v = heightCm     { patch["height_cm"]        = String(v) }
-        if let v = weightKg     { patch["weight_kg"]        = String(v) }
         if let v = activityLevel { patch["activity_level"]  = v }
         if let v = goal         { patch["goal"]             = v }
 
@@ -79,6 +91,11 @@ final class ProfileViewModel {
             .update(patch)
             .eq("user_id", value: userId.uuidString)
             .execute()
+
+        let currentKnownWeightKg = measurements.first?.weightKg ?? profile?.weightKg
+        if let weightKg, currentKnownWeightKg == nil || abs(weightKg - currentKnownWeightKg!) > 0.05 {
+            try await setWeight(weightKg, userId: userId)
+        }
 
         await load(userId: userId)
     }

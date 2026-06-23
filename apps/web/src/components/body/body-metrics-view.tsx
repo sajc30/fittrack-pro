@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
+import { X } from "lucide-react";
 import { useWeightUnit } from "@/lib/hooks/use-weight-unit";
 import { useProfile } from "@/lib/hooks/use-profile";
 import { useMeasurements, useAddMeasurement } from "@/lib/hooks/use-measurements";
@@ -198,7 +199,17 @@ export function BodyMetricsView() {
               borderRadius: 2,
             }}
           >
-            <p className="fig-label" style={{ fontSize: 11 }}>New entry — weight ({wUnit})</p>
+            <div className="flex items-center justify-between">
+              <p className="fig-label" style={{ fontSize: 11 }}>New entry — weight ({wUnit})</p>
+              <button
+                onClick={() => { setShowForm(false); setSaveError(null); setWeight(""); }}
+                className="p-1"
+                style={{ color: "var(--color-text-secondary)", borderRadius: 2 }}
+                aria-label="Cancel"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
             <div className="flex gap-3">
               <input
                 type="number"

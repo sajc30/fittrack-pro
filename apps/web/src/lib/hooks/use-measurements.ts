@@ -44,8 +44,22 @@ export function useAddMeasurement() {
         .single();
 
       if (error) throw error;
+
+      // Weight is a single timeline shared by Settings and the Body log —
+      // every new entry, wherever it's added, becomes the profile's current weight too.
+      if (measurement.weight_kg != null) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({ weight_kg: measurement.weight_kg, updated_at: new Date().toISOString() })
+          .eq("user_id", user.id);
+        if (profileError) throw profileError;
+      }
+
       return data;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["measurements"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["measurements"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
   });
 }
