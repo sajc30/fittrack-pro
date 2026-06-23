@@ -20,6 +20,9 @@ struct SettingsView: View {
     @State private var saved         = false
     @State private var saveError: String?
     @State private var showSignOutConfirm = false
+    @State private var showDeleteConfirm = false
+    @State private var isDeletingAccount = false
+    @State private var deleteAccountError: String?
 
     private static let dobFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -211,33 +214,52 @@ struct SettingsView: View {
 
                         // Spec D — Account
                         SpecSection(fig: "SPEC D — ACCOUNT") {
-                            HStack(spacing: 10) {
-                                Button { showSignOutConfirm = true } label: {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "rectangle.portrait.and.arrow.right")
-                                            .font(.system(size: 13))
-                                        Text("SIGN OUT")
-                                            .font(.blueprint(11, weight: .medium)).tracking(2)
+                            VStack(alignment: .leading, spacing: 10) {
+                                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                                    Button { showSignOutConfirm = true } label: {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                                .font(.system(size: 13))
+                                            Text("SIGN OUT")
+                                                .font(.blueprint(11, weight: .medium)).tracking(2)
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .foregroundStyle(Color.bpRedline)
+                                        .padding(.vertical, 10)
+                                        .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpRedline.opacity(0.5), lineWidth: 1))
                                     }
-                                    .foregroundStyle(Color.bpRedline)
-                                    .padding(.horizontal, 14).padding(.vertical, 10)
-                                    .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpRedline.opacity(0.5), lineWidth: 1))
+
+                                    Link(destination: URL(string: "https://fittrack-pro-web-nine.vercel.app/support")!) {
+                                        Text("SUPPORT")
+                                            .font(.blueprint(11, weight: .medium)).tracking(2)
+                                            .frame(maxWidth: .infinity)
+                                            .foregroundStyle(Color.bpTextSecondary)
+                                            .padding(.vertical, 10)
+                                            .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLine, lineWidth: 1))
+                                    }
+
+                                    Link(destination: URL(string: "https://fittrack-pro-web-nine.vercel.app/privacy")!) {
+                                        Text("PRIVACY")
+                                            .font(.blueprint(11, weight: .medium)).tracking(2)
+                                            .frame(maxWidth: .infinity)
+                                            .foregroundStyle(Color.bpTextSecondary)
+                                            .padding(.vertical, 10)
+                                            .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLine, lineWidth: 1))
+                                    }
+
+                                    Button { showDeleteConfirm = true } label: {
+                                        Text("DELETE ACCOUNT")
+                                            .font(.blueprint(11, weight: .medium)).tracking(2)
+                                            .frame(maxWidth: .infinity)
+                                            .foregroundStyle(Color.bpTextGhost)
+                                            .padding(.vertical, 10)
+                                            .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLine, lineWidth: 1))
+                                    }
                                 }
 
-                                Link(destination: URL(string: "https://fittrack-pro-web-nine.vercel.app/support")!) {
-                                    Text("SUPPORT")
-                                        .font(.blueprint(11, weight: .medium)).tracking(2)
-                                        .foregroundStyle(Color.bpTextSecondary)
-                                        .padding(.horizontal, 14).padding(.vertical, 10)
-                                        .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLine, lineWidth: 1))
-                                }
-
-                                Link(destination: URL(string: "https://fittrack-pro-web-nine.vercel.app/privacy")!) {
-                                    Text("PRIVACY")
-                                        .font(.blueprint(11, weight: .medium)).tracking(2)
-                                        .foregroundStyle(Color.bpTextSecondary)
-                                        .padding(.horizontal, 14).padding(.vertical, 10)
-                                        .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLine, lineWidth: 1))
+                                if let deleteAccountError {
+                                    Text("✕ \(deleteAccountError)")
+                                        .font(.blueprint(11)).foregroundStyle(Color.bpRedline)
                                 }
                             }
                         }
@@ -251,6 +273,25 @@ struct SettingsView: View {
         }
         .confirmationDialog("SIGN OUT?", isPresented: $showSignOutConfirm, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) { Task { try? await auth.signOut() } }
+            Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog(
+            "Delete your account? Your profile, workouts, and all logged data are permanently erased. This cannot be undone.",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Permanently", role: .destructive) {
+                Task {
+                    isDeletingAccount = true
+                    deleteAccountError = nil
+                    do {
+                        try await auth.deleteAccount()
+                    } catch {
+                        deleteAccountError = error.localizedDescription
+                    }
+                    isDeletingAccount = false
+                }
+            }
             Button("Cancel", role: .cancel) {}
         }
         .onAppear {

@@ -91,6 +91,10 @@ export function SettingsForm() {
   const { data: profile, isLoading } = useProfile();
   const updateProfile = useUpdateProfile();
 
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting,        setIsDeleting]        = useState(false);
+  const [deleteError,       setDeleteError]       = useState<string | null>(null);
+
   const [name,       setName]       = useState("");
   const [dob,        setDob]        = useState("");
   const [gender,     setGender]     = useState<Gender | "">("");
@@ -181,6 +185,32 @@ export function SettingsForm() {
     await supabase.auth.signOut();
     router.push("/auth/login");
     router.refresh();
+  }
+
+  async function handleDeleteAccount() {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No active session");
+
+      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/delete-account`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to delete account");
+      }
+
+      await supabase.auth.signOut();
+      router.push("/auth/login");
+      router.refresh();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete account");
+      setIsDeleting(false);
+    }
   }
 
   if (isLoading) {
@@ -400,7 +430,67 @@ export function SettingsForm() {
           >
             PRIVACY POLICY
           </a>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="px-4 py-2.5 font-display uppercase transition-all duration-150"
+            style={{
+              fontSize: 11,
+              letterSpacing: "0.08em",
+              borderRadius: 2,
+              color: "var(--color-text-ghost)",
+              border: "1px solid var(--color-line)",
+            }}
+          >
+            DELETE ACCOUNT
+          </button>
         </div>
+
+        {showDeleteConfirm && (
+          <div
+            className="mt-4 px-4 py-3 flex items-center justify-between gap-3 flex-wrap"
+            style={{
+              border: "1px solid var(--color-redline)",
+              borderRadius: 2,
+              backgroundColor: "color-mix(in srgb, var(--color-redline) 6%, transparent)",
+            }}
+          >
+            <div>
+              <p className="text-sm font-semibold" style={{ color: "var(--color-redline)" }}>
+                Delete your account?
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--color-text-secondary)" }}>
+                Your profile, workouts, and all logged data are permanently erased. This cannot be undone.
+              </p>
+              {deleteError && (
+                <p className="text-xs mt-1.5" style={{ color: "var(--color-redline)" }}>
+                  ✕ {deleteError}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => { setShowDeleteConfirm(false); setDeleteError(null); }}
+                className="bp-btn-outline h-8 px-3"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={isDeleting}
+                className="h-8 px-4 font-display uppercase disabled:opacity-60"
+                style={{
+                  backgroundColor: "var(--color-redline)",
+                  color: "var(--color-ink)",
+                  fontSize: 12,
+                  letterSpacing: "0.1em",
+                  borderRadius: 2,
+                }}
+              >
+                {isDeleting ? "DELETING…" : "DELETE PERMANENTLY"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
