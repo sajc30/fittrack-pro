@@ -16,9 +16,9 @@ import {
 } from "recharts";
 import { useLoggedExercises, useStrengthHistory } from "@/lib/hooks/use-exercises";
 import { useWorkouts } from "@/lib/hooks/use-workouts";
-import { estimateOneRepMax } from "@fittrack/shared";
-import { format, subWeeks, startOfWeek, endOfWeek } from "date-fns";
-import { ChevronDown } from "lucide-react";
+import { estimateOneRepMax, MUSCLE_GROUP_LABELS } from "@fittrack/shared";
+import { format, subWeeks, startOfWeek, endOfWeek, isSameWeek } from "date-fns";
+import { ChevronDown, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 
 const AXIS_TICK = {
   fontSize: 11,
@@ -94,6 +94,116 @@ function SetsTooltip({ active, payload }: { active?: boolean; payload?: Array<{ 
       <p style={{ color: "var(--color-text-secondary)", fontSize: 11, marginTop: 2 }}>
         WK OF {p.week.toUpperCase()}
       </p>
+    </div>
+  );
+}
+
+interface LoggedExercise { id: string; name: string; muscle_group: string }
+
+// Colloquial terms that span more than one muscle_group enum value (the enum
+// itself already covers "back", "chest", etc. via direct name/label matching).
+const MUSCLE_GROUP_SYNONYMS: Record<string, string[]> = {
+  legs: ["quadriceps", "hamstrings", "glutes", "calves"],
+  leg: ["quadriceps", "hamstrings", "glutes", "calves"],
+  arms: ["biceps", "triceps", "forearms"],
+  arm: ["biceps", "triceps", "forearms"],
+  abs: ["core"],
+  ab: ["core"],
+  butt: ["glutes"],
+  booty: ["glutes"],
+};
+
+function matchesQuery(ex: LoggedExercise, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  if (ex.name.toLowerCase().includes(q)) return true;
+
+  const groupLabel = (MUSCLE_GROUP_LABELS[ex.muscle_group as keyof typeof MUSCLE_GROUP_LABELS] ?? ex.muscle_group).toLowerCase();
+  const groupRaw = ex.muscle_group.replace(/_/g, " ").toLowerCase();
+  if (groupLabel.includes(q) || groupRaw.includes(q)) return true;
+
+  return Object.entries(MUSCLE_GROUP_SYNONYMS).some(
+    ([term, groups]) => (term.includes(q) || q.includes(term)) && groups.includes(ex.muscle_group)
+  );
+}
+
+/** Type-to-filter exercise picker — matches name OR muscle group (incl. "legs"/"arms" etc.). */
+function ExerciseSearchSelect({
+  exercises, selectedId, onSelect,
+}: {
+  exercises: LoggedExercise[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const selected = exercises.find((e) => e.id === selectedId);
+
+  const filtered = query.trim()
+    ? exercises.filter((e) => matchesQuery(e, query))
+    : exercises;
+
+  return (
+    <div className="relative w-full">
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "var(--color-text-ghost)" }} />
+        <input
+          type="text"
+          value={open ? query : selected?.name ?? ""}
+          onFocus={() => { setOpen(true); setQuery(""); }}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search exercises…"
+          className="w-full pl-9 pr-8 py-2 text-sm font-medium"
+          style={{
+            backgroundColor: "var(--color-sheet-inset)",
+            border: "1px solid var(--color-line)",
+            color: "var(--color-text-primary)",
+            borderRadius: 2,
+            outline: "none",
+          }}
+        />
+        {open ? (
+          <button
+            onClick={() => setOpen(false)}
+            className="absolute right-2 top-1/2 -translate-y-1/2"
+            style={{ color: "var(--color-text-ghost)" }}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        ) : (
+          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "var(--color-text-ghost)" }} />
+        )}
+      </div>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div
+            className="absolute left-0 right-0 top-full mt-1.5 z-20 max-h-64 overflow-y-auto"
+            style={{ backgroundColor: "var(--color-sheet-raised)", border: "1px solid var(--color-line-bright)", borderRadius: 2 }}
+          >
+            {filtered.length === 0 ? (
+              <p className="px-4 py-3 text-sm" style={{ color: "var(--color-text-ghost)" }}>
+                No logged exercises match &ldquo;{query}&rdquo;.
+              </p>
+            ) : (
+              filtered.map((ex) => (
+                <button
+                  key={ex.id}
+                  onClick={() => { onSelect(ex.id); setQuery(""); setOpen(false); }}
+                  className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-left transition-all hover:bg-[var(--color-line)]"
+                  style={{ color: ex.id === selectedId ? "var(--color-paper)" : "var(--color-text-primary)" }}
+                >
+                  <span className="text-sm font-medium truncate">{ex.name}</span>
+                  <span className="label-caps shrink-0" style={{ fontSize: 10 }}>
+                    {MUSCLE_GROUP_LABELS[ex.muscle_group as keyof typeof MUSCLE_GROUP_LABELS] ?? ex.muscle_group}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -194,6 +304,37 @@ export function ProgressCharts() {
     return weeks;
   }, [workouts]);
 
+  // Sets per muscle group for a single CALENDAR week, paged with prev/next —
+  // a rolling "last 7 days" window would cut a week in half depending on what
+  // day it is; paging by actual Sun–Sat weeks gives a stable, comparable count.
+  const [muscleWeekOffset, setMuscleWeekOffset] = useState(0);
+  const muscleWeekStart = useMemo(
+    () => startOfWeek(subWeeks(new Date(), muscleWeekOffset)),
+    [muscleWeekOffset]
+  );
+  const muscleWeekEnd = endOfWeek(muscleWeekStart);
+  const isCurrentMuscleWeek = isSameWeek(muscleWeekStart, new Date());
+
+  const muscleGroupData = useMemo(() => {
+    if (!workouts) return [];
+    const counts = new Map<string, number>();
+    for (const w of workouts) {
+      const d = new Date(w.started_at);
+      if (d < muscleWeekStart || d > muscleWeekEnd) continue;
+      const sets = (w.workout_sets as Array<{ exercises?: { muscle_group?: string } | null }>) ?? [];
+      for (const s of sets) {
+        const mg = s.exercises?.muscle_group;
+        if (!mg) continue;
+        counts.set(mg, (counts.get(mg) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .map(([muscle_group, sets]) => ({ muscle_group, sets }))
+      .sort((a, b) => b.sets - a.sets);
+  }, [workouts, muscleWeekStart, muscleWeekEnd]);
+
+  const maxMuscleSets = Math.max(1, ...muscleGroupData.map((m) => m.sets));
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderDot = (props: any) => {
     const { key, cx, cy, payload } = props as { key?: React.Key | null; cx?: number; cy?: number; payload?: E1rmPoint };
@@ -250,27 +391,13 @@ export function ProgressCharts() {
               ))}
             </div>
           </div>
-          {/* Exercise selector — only exercises with logged sets */}
+          {/* Exercise selector — search the exercises this user has actually logged */}
           {exercises && exercises.length > 0 ? (
-            <div className="relative w-full">
-              <select
-                value={selectedExerciseId}
-                onChange={(e) => setSelectedExerciseId(e.target.value)}
-                className="appearance-none w-full pl-3 pr-8 py-2 text-sm font-medium"
-                style={{
-                  backgroundColor: "var(--color-sheet-inset)",
-                  border: "1px solid var(--color-line)",
-                  color: "var(--color-text-primary)",
-                  borderRadius: 2,
-                  outline: "none",
-                }}
-              >
-                {exercises.map((ex) => (
-                  <option key={ex.id} value={ex.id}>{ex.name}</option>
-                ))}
-              </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none" style={{ color: "var(--color-text-ghost)" }} />
-            </div>
+            <ExerciseSearchSelect
+              exercises={exercises}
+              selectedId={selectedExerciseId}
+              onSelect={setSelectedExerciseId}
+            />
           ) : (
             <p className="text-sm" style={{ color: "var(--color-text-ghost)" }}>
               Nothing plotted yet — log a session and the curve draws itself.
@@ -363,6 +490,76 @@ export function ProgressCharts() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* FIG. 3 — sets by muscle group, paged by calendar week */}
+      <div className="sheet p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <p className="fig-label mb-1">Sets by muscle group</p>
+            <p className="label-caps" style={{ fontSize: 11 }}>
+              {format(muscleWeekStart, "MMM d")} – {format(muscleWeekEnd, "MMM d")}
+              {isCurrentMuscleWeek && " · THIS WEEK"}
+            </p>
+          </div>
+          <div className="flex gap-1 shrink-0">
+            <button
+              onClick={() => setMuscleWeekOffset((o) => o + 1)}
+              className="w-8 h-8 flex items-center justify-center transition-all"
+              style={{ border: "1px solid var(--color-line)", borderRadius: 2, color: "var(--color-text-secondary)" }}
+              aria-label="Previous week"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setMuscleWeekOffset((o) => Math.max(0, o - 1))}
+              disabled={isCurrentMuscleWeek}
+              className="w-8 h-8 flex items-center justify-center transition-all disabled:opacity-30"
+              style={{ border: "1px solid var(--color-line)", borderRadius: 2, color: "var(--color-text-secondary)" }}
+              aria-label="Next week"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {muscleGroupData.length === 0 ? (
+          <div className="h-32 flex items-center justify-center">
+            <p style={{ color: "var(--color-text-ghost)", fontSize: 14 }}>
+              No sets logged {isCurrentMuscleWeek ? "yet this week" : "this week"}.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {muscleGroupData.map((m) => (
+              <div key={m.muscle_group} className="flex items-center gap-3">
+                <span
+                  className="label-caps shrink-0"
+                  style={{ fontSize: 11, width: 96 }}
+                >
+                  {MUSCLE_GROUP_LABELS[m.muscle_group as keyof typeof MUSCLE_GROUP_LABELS] ?? m.muscle_group}
+                </span>
+                <div className="flex-1 h-5 relative" style={{ backgroundColor: "var(--color-sheet-inset)", borderRadius: 1 }}>
+                  <div
+                    className="h-full transition-all duration-300"
+                    style={{
+                      width: `${(m.sets / maxMuscleSets) * 100}%`,
+                      backgroundColor: "var(--color-paper)",
+                      opacity: 0.85,
+                      borderRadius: 1,
+                    }}
+                  />
+                </div>
+                <span
+                  className="shrink-0 text-right"
+                  style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--color-text-primary)", width: 56 }}
+                >
+                  {m.sets} SET{m.sets !== 1 ? "S" : ""}
+                </span>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>

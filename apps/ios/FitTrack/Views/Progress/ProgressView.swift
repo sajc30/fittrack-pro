@@ -32,6 +32,8 @@ struct ProgressView_: View {
                             .padding(.horizontal, 20)
                         WeeklySetsCard()
                             .padding(.horizontal, 20)
+                        MuscleGroupSetsCard()
+                            .padding(.horizontal, 20)
                         Spacer(minLength: 40)
                     }
                     .padding(.top, 20)
@@ -77,6 +79,7 @@ private struct StrengthCard: View {
     @Binding var selectedExerciseId: UUID?
     @Binding var range: ProgressRangeOption
     @AppStorage("settings_weightUnit") private var weightUnit: String = "kg"
+    @State private var showExercisePicker = false
     private var unitLabel: String { weightUnit == "lbs" ? "LBS" : "KG" }
     private func displayWeight(_ kg: Double) -> Double { weightUnit == "lbs" ? kg * 2.20462 : kg }
 
@@ -152,20 +155,33 @@ private struct StrengthCard: View {
         return totalSets > 0 ? (totalSets, totalReps, bestWeightKg, bestReps) : nil
     }
 
-    private var exercisePicker: some View {
+    private var loggedExercises: [Exercise] {
         let loggedIds = Set(workout.workouts.flatMap { $0.workoutSets ?? [] }.map(\.exerciseId))
-        let options   = workout.exercises.filter { loggedIds.contains($0.id) }
-        return Picker("Exercise", selection: $selectedExerciseId) {
-            ForEach(options) { ex in
-                Text(ex.name).tag(Optional(ex.id))
+        return workout.exercises.filter { loggedIds.contains($0.id) }
+    }
+
+    private var exercisePicker: some View {
+        let selectedName = workout.exercises.first { $0.id == selectedExerciseId }?.name
+        return Button { showExercisePicker = true } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.bpTextGhost)
+                Text(selectedName ?? "SEARCH EXERCISES")
+                    .font(.blueprint(12))
+                    .foregroundStyle(selectedName != nil ? Color.bpTextPrimary : Color.bpTextGhost)
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color.bpTextGhost)
             }
+            .padding(.horizontal, 12).padding(.vertical, 8)
+            .background(Color.bpSheetInset)
+            .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLine, lineWidth: 1))
         }
-        .pickerStyle(.menu)
-        .tint(Color.bpPaper)
-        .font(.blueprint(12))
-        .padding(.horizontal, 10).padding(.vertical, 6)
-        .background(Color.bpSheetInset)
-        .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLine, lineWidth: 1))
+        .sheet(isPresented: $showExercisePicker) {
+            LoggedExercisePickerSheet(exercises: loggedExercises, selected: $selectedExerciseId)
+        }
     }
 
     private var e1rmData: [E1rmPoint] {
@@ -194,6 +210,96 @@ private struct StrengthCard: View {
         case .sixMonths:   return cal.date(byAdding: .month, value: -6, to: now)!
         case .oneYear:     return cal.date(byAdding: .year,  value: -1, to: now)!
         case .all:         return Date(timeIntervalSince1970: 0)
+        }
+    }
+}
+
+// Colloquial terms that span more than one muscle_group value (the raw enum
+// value already covers "back", "chest", etc. via direct name matching).
+private let muscleGroupSynonyms: [String: Set<String>] = [
+    "legs": ["quadriceps", "hamstrings", "glutes", "calves"],
+    "leg": ["quadriceps", "hamstrings", "glutes", "calves"],
+    "arms": ["biceps", "triceps", "forearms"],
+    "arm": ["biceps", "triceps", "forearms"],
+    "abs": ["core"],
+    "ab": ["core"],
+    "butt": ["glutes"],
+    "booty": ["glutes"],
+]
+
+private func exerciseMatches(_ ex: Exercise, query: String) -> Bool {
+    let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+    guard !q.isEmpty else { return true }
+    if ex.name.localizedCaseInsensitiveContains(q) { return true }
+
+    let groupRaw = ex.muscleGroup.replacingOccurrences(of: "_", with: " ").lowercased()
+    if groupRaw.contains(q) { return true }
+
+    return muscleGroupSynonyms.contains { term, groups in
+        (term.contains(q) || q.contains(term)) && groups.contains(ex.muscleGroup)
+    }
+}
+
+// Type-to-filter exercise picker, scoped to exercises the user has actually logged.
+// Matches name OR muscle group (including colloquial terms like "legs"/"arms").
+private struct LoggedExercisePickerSheet: View {
+    let exercises: [Exercise]
+    @Binding var selected: UUID?
+    @Environment(\.dismiss) private var dismiss
+    @State private var search = ""
+
+    private var filtered: [Exercise] {
+        if search.isEmpty { return exercises }
+        return exercises.filter { exerciseMatches($0, query: search) }
+    }
+
+    var body: some View {
+        ZStack {
+            Color.bpInk.ignoresSafeArea()
+            VStack(spacing: 0) {
+                VStack(spacing: 12) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.bpLine)
+                        .frame(width: 36, height: 4)
+                    Text("SEARCH LOGGED EXERCISES").figLabel(size: 10)
+                    BPTextField(placeholder: "Search exercises…", text: $search)
+                        .padding(.horizontal, 20)
+                }
+                .padding(.top, 12)
+                .padding(.bottom, 12)
+
+                Divider().background(Color.bpLine)
+
+                if filtered.isEmpty {
+                    Text("No logged exercises match \u{201c}\(search)\u{201d}.")
+                        .font(.blueprint(12))
+                        .foregroundStyle(Color.bpTextGhost)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
+                    Spacer()
+                } else {
+                    List(filtered) { ex in
+                        Button {
+                            selected = ex.id
+                            dismiss()
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(ex.name)
+                                        .font(.blueprint(13))
+                                        .foregroundStyle(ex.id == selected ? Color.bpPaper : Color.bpTextPrimary)
+                                    Text(ex.muscleGroup.replacingOccurrences(of: "_", with: " ").uppercased())
+                                        .figLabel(size: 9)
+                                }
+                                Spacer()
+                            }
+                        }
+                        .listRowBackground(Color.bpSheet)
+                    }
+                    .listStyle(.plain)
+                    .background(Color.bpInk)
+                }
+            }
         }
     }
 }
@@ -290,6 +396,107 @@ private struct WeeklySetsCard: View {
             result.append(WeekBar(label: label, count: Double(count), isCurrent: weeksAgo == 0))
         }
         return result
+    }
+}
+
+// MARK: - FIG. 3 — Sets by muscle group, paged by calendar week
+
+private struct MuscleGroupSetsCard: View {
+    @Environment(WorkoutViewModel.self) private var workout
+    // 0 = current week, increasing = further back. A rolling "last 7 days" window
+    // would cut a calendar week in half depending on what day it is; paging by
+    // actual Sun–Sat weeks gives a stable, comparable count.
+    @State private var weekOffset = 0
+
+    private var cal: Calendar { Calendar.current }
+
+    private var weekStart: Date {
+        let ref = cal.date(byAdding: .weekOfYear, value: -weekOffset, to: Date())!
+        let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: ref)
+        return cal.date(from: comps)!
+    }
+    private var weekEnd: Date { cal.date(byAdding: .weekOfYear, value: 1, to: weekStart)! }
+    private var isCurrentWeek: Bool { weekOffset == 0 }
+
+    private var muscleGroupData: [(muscle: String, sets: Int)] {
+        var counts: [String: Int] = [:]
+        for w in workout.workouts {
+            guard w.startedAt >= weekStart, w.startedAt < weekEnd else { continue }
+            for s in w.workoutSets ?? [] {
+                guard let mg = s.exercise?.muscleGroup else { continue }
+                counts[mg, default: 0] += 1
+            }
+        }
+        return counts.map { ($0.key, $0.value) }.sorted { $0.1 > $1.1 }
+    }
+
+    private var weekRangeLabel: String {
+        let start = weekStart.formatted(.dateTime.month(.abbreviated).day())
+        let end = cal.date(byAdding: .day, value: 6, to: weekStart)!.formatted(.dateTime.month(.abbreviated).day())
+        return "\(start) – \(end)".uppercased()
+    }
+
+    var body: some View {
+        SheetCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("SETS BY MUSCLE GROUP").figLabel(size: 10)
+                        Text(weekRangeLabel + (isCurrentWeek ? " · THIS WEEK" : ""))
+                            .font(.blueprint(9)).foregroundStyle(Color.bpTextGhost)
+                    }
+                    Spacer()
+                    HStack(spacing: 6) {
+                        Button { weekOffset += 1 } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Color.bpTextSecondary)
+                                .frame(width: 28, height: 28)
+                                .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLine, lineWidth: 1))
+                        }
+                        Button { weekOffset = max(0, weekOffset - 1) } label: {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(isCurrentWeek ? Color.bpTextGhost.opacity(0.4) : Color.bpTextSecondary)
+                                .frame(width: 28, height: 28)
+                                .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLine, lineWidth: 1))
+                        }
+                        .disabled(isCurrentWeek)
+                    }
+                }
+                Divider().background(Color.bpLine)
+
+                let data = muscleGroupData
+                if data.isEmpty {
+                    Text(isCurrentWeek ? "No sets logged yet this week." : "No sets logged this week.")
+                        .font(.blueprint(12)).foregroundStyle(Color.bpTextGhost)
+                        .frame(maxWidth: .infinity).padding(.vertical, 24)
+                } else {
+                    let maxSets = data.map(\.sets).max() ?? 1
+                    VStack(spacing: 8) {
+                        ForEach(data, id: \.muscle) { row in
+                            HStack(spacing: 10) {
+                                Text(row.muscle.replacingOccurrences(of: "_", with: " ").uppercased())
+                                    .figLabel(size: 9)
+                                    .frame(width: 76, alignment: .leading)
+                                GeometryReader { geo in
+                                    RoundedRectangle(cornerRadius: 1)
+                                        .fill(Color.bpPaper.opacity(0.85))
+                                        .frame(width: geo.size.width * CGFloat(row.sets) / CGFloat(maxSets))
+                                }
+                                .frame(height: 18)
+                                .background(Color.bpSheetInset)
+                                Text("\(row.sets) SET\(row.sets != 1 ? "S" : "")")
+                                    .font(.blueprint(11))
+                                    .foregroundStyle(Color.bpTextPrimary)
+                                    .frame(width: 52, alignment: .trailing)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(18)
+        }
     }
 }
 
