@@ -11,12 +11,10 @@ struct OnboardingView: View {
     @State private var dob    = Calendar.current.date(byAdding: .year, value: -25, to: Date()) ?? Date()
     @State private var gender = ""
 
-    // Step 1 — Biometrics
-    @State private var heightCm    = ""
-    @State private var heightFt    = ""
-    @State private var heightIn    = ""
+    // Step 1 — Biometrics (imperial entry; stored as cm/kg)
+    @State private var heightFt    = "5"
+    @State private var heightIn    = "9"
     @State private var weightKg    = ""
-    @State private var useImperial = false
 
     // Step 2 — Programme
     @State private var activity = "moderately_active"
@@ -30,7 +28,7 @@ struct OnboardingView: View {
     private var canAdvance: Bool {
         switch step {
         case 0: return !name.isEmpty && !gender.isEmpty
-        case 1: return (useImperial ? !heightFt.isEmpty : !heightCm.isEmpty) && !weightKg.isEmpty
+        case 1: return !heightFt.isEmpty && !weightKg.isEmpty
         default: return true
         }
     }
@@ -153,36 +151,24 @@ struct OnboardingView: View {
             }
         case 1:
             VStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("UNIT SYSTEM").figLabel(size: 9)
-                    HStack(spacing: 8) {
-                        BPChip(label: "METRIC",   isActive: !useImperial) { useImperial = false }
-                        BPChip(label: "IMPERIAL",  isActive: useImperial)  { useImperial = true  }
-                    }
-                }
                 VStack(alignment: .leading, spacing: 6) {
                     Text("HEIGHT").figLabel(size: 9)
-                    if useImperial {
-                        HStack(spacing: 8) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("FT").figLabel(size: 8)
-                                BPTextField(placeholder: "5", text: $heightFt)
-                                    .keyboardType(.numberPad)
-                            }
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("IN").figLabel(size: 8)
-                                BPTextField(placeholder: "0", text: $heightIn)
-                                    .keyboardType(.numberPad)
-                            }
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("FT").figLabel(size: 8)
+                            BPTextField(placeholder: "5", text: $heightFt)
+                                .keyboardType(.numberPad)
                         }
-                    } else {
-                        BPTextField(placeholder: "e.g. 180", text: $heightCm)
-                            .keyboardType(.decimalPad)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("IN").figLabel(size: 8)
+                            BPTextField(placeholder: "0", text: $heightIn)
+                                .keyboardType(.numberPad)
+                        }
                     }
                 }
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(useImperial ? "WEIGHT (LBS)" : "WEIGHT (KG)").figLabel(size: 9)
-                    BPTextField(placeholder: useImperial ? "e.g. 176" : "e.g. 80", text: $weightKg)
+                    Text("WEIGHT (LBS)").figLabel(size: 9)
+                    BPTextField(placeholder: "e.g. 176", text: $weightKg)
                         .keyboardType(.decimalPad)
                 }
             }
@@ -232,16 +218,11 @@ struct OnboardingView: View {
         isSaving = true
         error = nil
         Task {
-            let hCm: Double
-            if useImperial {
-                let ft = Double(heightFt) ?? 0
-                let i  = Double(heightIn)  ?? 0
-                hCm = ft * 30.48 + i * 2.54
-            } else {
-                hCm = Double(heightCm) ?? 0
-            }
+            let ft = Double(heightFt) ?? 0
+            let inch = Double(heightIn) ?? 0
+            let hCm = ft * 30.48 + inch * 2.54
             let rawW = Double(weightKg) ?? 0
-            let wKg = useImperial ? rawW / 2.20462 : rawW
+            let wKg = rawW / 2.20462
             let dobString = Self.dobFormatter.string(from: dob)
             do {
                 guard let uid = auth.session?.user.id else { return }

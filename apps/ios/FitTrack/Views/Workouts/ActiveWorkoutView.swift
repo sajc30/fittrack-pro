@@ -3,19 +3,24 @@ import SwiftUI
 struct ActiveWorkoutView: View {
     @Environment(AuthViewModel.self)    private var auth
     @Environment(WorkoutViewModel.self) private var workout
+    @Environment(ProfileViewModel.self) private var profile
 
     @State private var selectedExercise: Exercise?
     @State private var weightInput = ""
     @State private var repsInput   = ""
     @State private var showExercisePicker = false
-    @State private var restSeconds = 0
-    @State private var restTask: Task<Void, Never>?
     @State private var showVoidConfirm = false
     @State private var elapsedSeconds = 0
     @State private var elapsedTask: Task<Void, Never>?
     @State private var weightUnit: String = "kg"
 
     private var weightUnitLabel: String { weightUnit == "lbs" ? "LBS" : "KG" }
+
+    // Latest logged body weight wins over the profile field, mirroring the Body page.
+    private var currentBodyweightDisplay: Double? {
+        guard let kg = profile.measurements.first?.weightKg ?? profile.profile?.weightKg else { return nil }
+        return weightUnit == "lbs" ? kg * 2.20462 : kg
+    }
 
     // Group sets by exercise for display
     private var setsByExercise: [(exercise: Exercise?, sets: [WorkoutSet])] {
@@ -68,26 +73,6 @@ struct ActiveWorkoutView: View {
                 .padding(.bottom, 12)
 
                 Divider().background(Color.bpLine).padding(.horizontal, 20)
-
-                // Rest timer bar
-                if restSeconds > 0 {
-                    HStack(spacing: 8) {
-                        Text("REST \(restSeconds)s")
-                            .font(.blueprint(11, weight: .medium))
-                            .foregroundStyle(Color.bpPaper)
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                RoundedRectangle(cornerRadius: 1).fill(Color.bpLine).frame(height: 2)
-                                RoundedRectangle(cornerRadius: 1).fill(Color.bpPaper)
-                                    .frame(width: geo.size.width * CGFloat(restSeconds) / 90.0, height: 2)
-                                    .animation(.linear(duration: 1), value: restSeconds)
-                            }
-                        }
-                        .frame(height: 2)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                }
 
                 // Sets list
                 ScrollView {
@@ -153,6 +138,13 @@ struct ActiveWorkoutView: View {
                         .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLine, lineWidth: 1))
                     }
 
+                    if selectedExercise?.equipment == "bodyweight" {
+                        Text(bodyweightHint)
+                            .font(.blueprint(10))
+                            .foregroundStyle(Color.bpTextGhost)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
                     HStack(spacing: 10) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("WEIGHT (\(weightUnitLabel))").figLabel(size: 8)
@@ -190,7 +182,23 @@ struct ActiveWorkoutView: View {
             startElapsedTimer()
             weightUnit = UserDefaults.standard.string(forKey: "settings_weightUnit") ?? "kg"
         }
-        .onDisappear { elapsedTask?.cancel(); restTask?.cancel() }
+        .onChange(of: selectedExercise) { _, newValue in
+            guard newValue?.equipment == "bodyweight", weightInput.isEmpty,
+                  let bw = currentBodyweightDisplay else { return }
+            weightInput = fmt(bw)
+        }
+        .onDisappear { elapsedTask?.cancel() }
+    }
+
+    private var bodyweightHint: String {
+        if let bw = currentBodyweightDisplay {
+            return "Bodyweight exercise — load defaults to your logged body weight (\(fmt(bw)) \(weightUnitLabel)). Edit it to add a vest or belt."
+        }
+        return "Bodyweight exercise — log your body weight as the load, plus any added weight (vest, belt)."
+    }
+
+    private func fmt(_ v: Double) -> String {
+        v.truncatingRemainder(dividingBy: 1) == 0 ? String(format: "%.0f", v) : String(format: "%.1f", v)
     }
 
     private var elapsedFormatted: String {
@@ -229,15 +237,6 @@ struct ActiveWorkoutView: View {
         Task {
             await workout.logSet(exerciseId: ex.id, weight: weightKg, reps: reps)
             repsInput = ""
-            restSeconds = 90
-            restTask?.cancel()
-            restTask = Task { @MainActor in
-                while restSeconds > 0 && !Task.isCancelled {
-                    try? await Task.sleep(nanoseconds: 1_000_000_000)
-                    guard !Task.isCancelled else { break }
-                    restSeconds -= 1
-                }
-            }
         }
     }
 

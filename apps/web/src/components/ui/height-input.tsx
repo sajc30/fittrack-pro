@@ -6,7 +6,6 @@ import { ChevronDown } from "lucide-react";
 interface Props {
   valueCm: string;          // always stored as cm string
   onChange: (cm: string) => void;
-  unit: "metric" | "imperial";
 }
 
 function cmToFeetInches(cm: number): { feet: number; inches: number } {
@@ -20,7 +19,7 @@ function feetInchesToCm(feet: number, inches: number): number {
   return Math.round((feet * 30.48 + inches * 2.54) * 10) / 10;
 }
 
-export function HeightInput({ valueCm, onChange, unit }: Props) {
+export function HeightInput({ valueCm, onChange }: Props) {
   const cmNum = parseFloat(valueCm) || 0;
   const { feet: initFeet, inches: initInches } = cmNum
     ? cmToFeetInches(cmNum)
@@ -31,7 +30,7 @@ export function HeightInput({ valueCm, onChange, unit }: Props) {
 
   // Sync when external valueCm changes (e.g. profile load)
   useEffect(() => {
-    if (cmNum && unit === "imperial") {
+    if (cmNum) {
       const { feet: f, inches: i } = cmToFeetInches(cmNum);
       setFeet(f);
       setInches(i);
@@ -56,24 +55,6 @@ export function HeightInput({ valueCm, onChange, unit }: Props) {
     paddingRight: 32,
     cursor: "pointer",
   };
-
-  if (unit === "metric") {
-    return (
-      <div className="flex items-center gap-2">
-        <input
-          type="number"
-          value={valueCm}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="e.g. 178"
-          min={100} max={250}
-          style={inputStyle}
-          onFocus={(e) => (e.target.style.borderColor = "var(--color-amber)")}
-          onBlur={(e) => (e.target.style.borderColor = "var(--color-border)")}
-        />
-        <span className="text-sm shrink-0" style={{ color: "var(--color-text-secondary)" }}>cm</span>
-      </div>
-    );
-  }
 
   // Imperial — two selects
   const feetOptions = [4, 5, 6, 7];

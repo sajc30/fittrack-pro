@@ -62,12 +62,9 @@ export function BodyMetricsView() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const [weightUnit, setWeightUnit] = useState<"kg" | "lbs">("kg");
-  const [heightUnit, setHeightUnit] = useState<"metric" | "imperial">("metric");
-  useEffect(() => {
-    setWeightUnit((localStorage.getItem("settings_weightUnit") as "kg" | "lbs") ?? "kg");
-    setHeightUnit((localStorage.getItem("settings_heightUnit") as "metric" | "imperial") ?? "metric");
-  }, []);
+  // Imperial-only across the app (lbs + ft/in). DB stores kg/cm; convert at display/entry.
+  const weightUnit = "lbs" as const;
+  const heightUnit = "imperial" as const;
 
   const latest = measurements?.[0];
 

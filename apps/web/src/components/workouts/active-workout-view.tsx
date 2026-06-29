@@ -9,37 +9,18 @@ import {
   useFinishWorkout,
   useLogSet,
 } from "@/lib/hooks/use-workouts";
-import { useWeightUnit, toKg } from "@/lib/hooks/use-weight-unit";
+import { useWeightUnit, toKg, fromKg } from "@/lib/hooks/use-weight-unit";
+import { useProfile } from "@/lib/hooks/use-profile";
+import { useMeasurements } from "@/lib/hooks/use-measurements";
 import { ExercisePicker } from "./exercise-picker";
 import { estimateOneRepMax } from "@fittrack/shared";
 import { createClient } from "@/lib/supabase/client";
 import { X, Plus, Check, Clock, Trophy, ArrowRight } from "lucide-react";
 
-const DEFAULT_REST = 90;
-
 function formatTime(s: number) {
   const m = Math.floor(s / 60);
   const sec = s % 60;
   return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
-}
-
-/** Rest countdown drawn as a depleting dimension arc. */
-function RestArc({ remaining, total }: { remaining: number; total: number }) {
-  const R = 8;
-  const C = 2 * Math.PI * R;
-  const frac = Math.max(0, Math.min(1, remaining / total));
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
-      <circle cx="10" cy="10" r={R} fill="none" stroke="var(--color-line)" strokeWidth="2" />
-      <circle
-        cx="10" cy="10" r={R} fill="none"
-        stroke="var(--color-paper)" strokeWidth="2"
-        strokeDasharray={C} strokeDashoffset={C * (1 - frac)}
-        transform="rotate(-90 10 10)"
-        style={{ transition: "stroke-dashoffset 1s linear" }}
-      />
-    </svg>
-  );
 }
 
 export function ActiveWorkoutView() {
@@ -50,6 +31,12 @@ export function ActiveWorkoutView() {
   const finishWorkout = useFinishWorkout();
   const logSet = useLogSet();
   const { unit, label } = useWeightUnit();
+  const { data: profile } = useProfile();
+  const { data: measurements } = useMeasurements();
+
+  // Latest logged body weight wins over the profile field, mirroring the Body page.
+  const currentBodyweightKg = measurements?.[0]?.weight_kg ?? profile?.weight_kg ?? null;
+  const bodyweightDisplay = currentBodyweightKg != null ? fromKg(currentBodyweightKg, unit) : null;
 
   const [showPicker, setShowPicker] = useState(false);
   const [workoutName, setWorkoutName] = useState("Morning Workout");
@@ -71,10 +58,6 @@ export function ActiveWorkoutView() {
   const elapsedSeconds = store.startedAt
     ? Math.max(0, Math.floor((now - new Date(store.startedAt).getTime()) / 1000))
     : 0;
-  const restSeconds = store.restEndsAt
-    ? Math.max(0, Math.ceil((store.restEndsAt - now) / 1000))
-    : 0;
-  const isResting = restSeconds > 0;
 
   async function handleStart() {
     setActionError(null);
@@ -134,7 +117,6 @@ export function ActiveWorkoutView() {
       }
 
       store.markSetLogged(exerciseIndex, setIndex, isPR);
-      store.startRest(DEFAULT_REST);
     } catch {
       setActionError("Could not save the set — check your connection and try again.");
     }
@@ -218,19 +200,6 @@ export function ActiveWorkoutView() {
 
   return (
     <div className="h-screen flex flex-col">
-      {/* Rest countdown line at top — a depleting dimension */}
-      {isResting && (
-        <div className="h-0.5 w-full shrink-0" style={{ backgroundColor: "var(--color-line)" }}>
-          <div
-            className="h-full transition-all duration-1000"
-            style={{
-              width: `${(restSeconds / DEFAULT_REST) * 100}%`,
-              backgroundColor: "var(--color-paper)",
-            }}
-          />
-        </div>
-      )}
-
       {/* Header */}
       <div
         className="flex items-center justify-between px-6 py-4 border-b shrink-0"
@@ -347,35 +316,6 @@ export function ActiveWorkoutView() {
             </div>
           )}
 
-          {/* Rest timer chip — dimension arc */}
-          {isResting && (
-            <div className="flex justify-center mt-3 shrink-0">
-              <div
-                className="flex items-center gap-2.5 px-4 py-2"
-                style={{
-                  backgroundColor: "var(--color-sheet)",
-                  border: "1px solid var(--color-line-bright)",
-                  borderRadius: 2,
-                }}
-              >
-                <RestArc remaining={restSeconds} total={DEFAULT_REST} />
-                <span
-                  className="font-display"
-                  style={{ color: "var(--color-text-primary)", fontSize: 13, letterSpacing: "0.08em" }}
-                >
-                  REST {formatTime(restSeconds)}
-                </span>
-                <button
-                  onClick={() => store.clearRest()}
-                  className="label-caps ml-1 transition-colors hover:!text-[var(--color-text-primary)]"
-                  style={{ fontSize: 11 }}
-                >
-                  Skip
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Active exercise */}
           {currentEx && (
             <div className="flex-1 overflow-y-auto px-6 py-4">
@@ -384,6 +324,13 @@ export function ActiveWorkoutView() {
                 <h2 className="text-xl font-semibold" style={{ color: "var(--color-text-primary)" }}>
                   {currentEx.exerciseName}
                 </h2>
+                {currentEx.equipment === "bodyweight" && (
+                  <p className="text-xs mt-1" style={{ color: "var(--color-text-ghost)" }}>
+                    Bodyweight exercise — load defaults to your logged body weight
+                    {bodyweightDisplay != null ? ` (${Math.round(bodyweightDisplay * 10) / 10} ${label.toLowerCase()})` : ""}.
+                    Edit it to add a weighted vest or belt.
+                  </p>
+                )}
               </div>
 
               {/* Set rows */}
@@ -423,7 +370,14 @@ export function ActiveWorkoutView() {
       {showPicker && (
         <ExercisePicker
           onSelect={(ex) => {
-            store.addExercise({ exerciseId: ex.id, exerciseName: ex.name, muscleGroup: ex.muscle_group });
+            const isBodyweight = ex.equipment === "bodyweight";
+            const initialWeight = isBodyweight && bodyweightDisplay != null
+              ? String(Math.round(bodyweightDisplay * 10) / 10)
+              : undefined;
+            store.addExercise(
+              { exerciseId: ex.id, exerciseName: ex.name, muscleGroup: ex.muscle_group, equipment: ex.equipment },
+              initialWeight
+            );
             setShowPicker(false);
           }}
           onClose={() => setShowPicker(false)}

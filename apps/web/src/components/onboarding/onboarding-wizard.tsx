@@ -58,8 +58,7 @@ export function OnboardingWizard({ userId, existingName }: { userId: string; exi
 
   // Step 1
   const [heightCm,  setHeightCm]  = useState("");
-  const [weightVal, setWeightVal] = useState("");
-  const [unit,      setUnit]      = useState<"metric" | "imperial">("metric");
+  const [weightVal, setWeightVal] = useState("");  // entered as lbs, stored as kg
 
   // Step 2
   const [activity, setActivity] = useState<ActivityLevel>("moderately_active");
@@ -75,8 +74,7 @@ export function OnboardingWizard({ userId, existingName }: { userId: string; exi
     setSaving(true);
     setError(null);
     const supabase = createClient();
-    let weightKg = parseFloat(weightVal);
-    if (unit === "imperial") weightKg = weightKg / 2.20462;
+    const weightKg = parseFloat(weightVal) / 2.20462;
     const roundedWeightKg = Math.round(weightKg * 10) / 10;
 
     const { error: err } = await supabase
@@ -214,52 +212,25 @@ export function OnboardingWizard({ userId, existingName }: { userId: string; exi
         {step === 1 && (
           <div className="space-y-5">
             <div>
-              <p className="fig-label mb-2" style={{ fontSize: 10 }}>Unit system</p>
-              <div className="flex gap-1.5">
-                {([
-                  { value: "metric",   label: "METRIC" },
-                  { value: "imperial", label: "IMPERIAL" },
-                ] as const).map((u) => (
-                  <button
-                    key={u.value}
-                    type="button"
-                    onClick={() => setUnit(u.value)}
-                    className="px-3 py-1.5 font-display uppercase transition-all duration-150"
-                    style={{
-                      fontSize: 11,
-                      letterSpacing: "0.1em",
-                      borderRadius: 2,
-                      backgroundColor: unit === u.value ? "var(--color-paper)" : "transparent",
-                      color: unit === u.value ? "var(--color-ink)" : "var(--color-text-ghost)",
-                      border: `1px solid ${unit === u.value ? "var(--color-paper)" : "var(--color-line)"}`,
-                    }}
-                  >
-                    {u.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
               <p className="fig-label mb-2" style={{ fontSize: 10 }}>Height</p>
-              <HeightInput valueCm={heightCm} onChange={setHeightCm} unit={unit} />
+              <HeightInput valueCm={heightCm} onChange={setHeightCm} />
             </div>
 
             <div>
-              <p className="fig-label mb-2" style={{ fontSize: 10 }}>Body weight ({unit === "imperial" ? "lbs" : "kg"})</p>
+              <p className="fig-label mb-2" style={{ fontSize: 10 }}>Body weight (lbs)</p>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
                   step="0.1"
                   value={weightVal}
                   onChange={(e) => setWeightVal(e.target.value)}
-                  placeholder={unit === "imperial" ? "e.g. 176" : "e.g. 80"}
+                  placeholder="e.g. 176"
                   style={MONO_INPUT}
                   onFocus={(e) => (e.target.style.borderColor = "var(--color-paper)")}
                   onBlur={(e)  => (e.target.style.borderColor = "var(--color-line)")}
                 />
                 <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--color-text-ghost)", whiteSpace: "nowrap" }}>
-                  {unit === "imperial" ? "lbs" : "kg"}
+                  lbs
                 </span>
               </div>
             </div>

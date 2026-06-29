@@ -8,12 +8,10 @@ struct SettingsView: View {
     @State private var name          = ""
     @State private var dob           = Calendar.current.date(byAdding: .year, value: -25, to: Date()) ?? Date()
     @State private var gender        = ""
-    @State private var heightCm      = ""   // always cm
+    @State private var heightCm      = ""   // derived from ft/in, stored as cm
     @State private var heightFt      = "5"
     @State private var heightIn      = "9"
-    @State private var weightKg      = ""   // always kg
-    @State private var useImperialHeight = UserDefaults.standard.bool(forKey: "settings_imperialHeight")
-    @State private var useImperialWeight = UserDefaults.standard.bool(forKey: "settings_imperialWeight")
+    @State private var weightKg      = ""   // entered as lbs, stored as kg
     @State private var activityLevel = "moderately_active"
     @State private var goal          = "build_muscle"
     @State private var isSaving      = false
@@ -102,67 +100,24 @@ struct SettingsView: View {
                         // Spec B — Biometrics
                         SpecSection(fig: "SPEC B — BIOMETRICS") {
                             FieldBlock(label: "HEIGHT") {
-                                HStack {
-                                    Spacer()
-                                    BPChip(label: "CM", isActive: !useImperialHeight) {
-                                        useImperialHeight = false
-                                        UserDefaults.standard.set(false, forKey: "settings_imperialHeight")
+                                HStack(spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("FT").figLabel(size: 8)
+                                        BPTextField(placeholder: "5", text: $heightFt)
+                                            .keyboardType(.numberPad)
+                                            .onChange(of: heightFt) { _, _ in syncHeightCm() }
                                     }
-                                    BPChip(label: "FT·IN", isActive: useImperialHeight) {
-                                        if !useImperialHeight, let cm = Double(heightCm) {
-                                            let totalInches = cm / 2.54
-                                            heightFt = String(Int(totalInches / 12))
-                                            heightIn = String(Int(totalInches.truncatingRemainder(dividingBy: 12).rounded()))
-                                        }
-                                        useImperialHeight = true
-                                        UserDefaults.standard.set(true, forKey: "settings_imperialHeight")
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("IN").figLabel(size: 8)
+                                        BPTextField(placeholder: "0", text: $heightIn)
+                                            .keyboardType(.numberPad)
+                                            .onChange(of: heightIn) { _, _ in syncHeightCm() }
                                     }
-                                }
-                                if useImperialHeight {
-                                    HStack(spacing: 8) {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text("FT").figLabel(size: 8)
-                                            BPTextField(placeholder: "5", text: $heightFt)
-                                                .keyboardType(.numberPad)
-                                                .onChange(of: heightFt) { _, _ in syncHeightCm() }
-                                        }
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text("IN").figLabel(size: 8)
-                                            BPTextField(placeholder: "0", text: $heightIn)
-                                                .keyboardType(.numberPad)
-                                                .onChange(of: heightIn) { _, _ in syncHeightCm() }
-                                        }
-                                    }
-                                } else {
-                                    BPTextField(placeholder: "e.g. 180", text: $heightCm)
-                                        .keyboardType(.decimalPad)
                                 }
                             }
-                            FieldBlock(label: "WEIGHT") {
-                                HStack {
-                                    Spacer()
-                                    BPChip(label: "KG",  isActive: !useImperialWeight) {
-                                        if useImperialWeight, let lbs = Double(weightKg) {
-                                            weightKg = String(format: "%.1f", lbs / 2.20462)
-                                        }
-                                        useImperialWeight = false
-                                        UserDefaults.standard.set(false, forKey: "settings_imperialWeight")
-                                        UserDefaults.standard.set("kg", forKey: "settings_weightUnit")
-                                    }
-                                    BPChip(label: "LBS", isActive: useImperialWeight) {
-                                        if !useImperialWeight, let kg = Double(weightKg) {
-                                            weightKg = String(format: "%.1f", kg * 2.20462)
-                                        }
-                                        useImperialWeight = true
-                                        UserDefaults.standard.set(true, forKey: "settings_imperialWeight")
-                                        UserDefaults.standard.set("lbs", forKey: "settings_weightUnit")
-                                    }
-                                }
-                                BPTextField(
-                                    placeholder: useImperialWeight ? "e.g. 176" : "e.g. 80",
-                                    text: $weightKg
-                                )
-                                .keyboardType(.decimalPad)
+                            FieldBlock(label: "WEIGHT (LBS)") {
+                                BPTextField(placeholder: "e.g. 176", text: $weightKg)
+                                    .keyboardType(.decimalPad)
                             }
                         }
 
@@ -297,7 +252,7 @@ struct SettingsView: View {
         }
         .onAppear {
             prefillFromProfile()
-            UserDefaults.standard.set(useImperialWeight ? "lbs" : "kg", forKey: "settings_weightUnit")
+            UserDefaults.standard.set("lbs", forKey: "settings_weightUnit")
         }
         .onChange(of: profile.profile) { _, _ in prefillFromProfile() }
     }
@@ -321,9 +276,7 @@ struct SettingsView: View {
             heightIn = String(Int(totalInches.truncatingRemainder(dividingBy: 12).rounded()))
         }
         if let w = p.weightKg {
-            weightKg = useImperialWeight
-                ? String(format: "%.1f", w * 2.20462)
-                : String(format: "%.1f", w)
+            weightKg = String(format: "%.1f", w * 2.20462)
         }
         activityLevel = p.activityLevel ?? "moderately_active"
         goal          = p.goal ?? "build_muscle"
@@ -337,7 +290,7 @@ struct SettingsView: View {
                 guard let uid = auth.session?.user.id else { return }
                 let hCm = Double(heightCm) ?? 0
                 let rawW = Double(weightKg) ?? 0
-                let wKg = useImperialWeight ? rawW / 2.20462 : rawW
+                let wKg = rawW / 2.20462
                 try await profile.save(
                     userId: uid,
                     name: name,

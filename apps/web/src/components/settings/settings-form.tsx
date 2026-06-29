@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useProfile, useUpdateProfile } from "@/lib/hooks/use-profile";
 import { useMeasurements, useAddMeasurement } from "@/lib/hooks/use-measurements";
@@ -62,31 +62,6 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
   );
 }
 
-function UnitToggle({ options, value, onChange }: { options: { value: string; label: string }[]; value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="flex gap-1">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onChange(o.value)}
-          className="px-2.5 py-1 font-display uppercase transition-all duration-150"
-          style={{
-            fontSize: 11,
-            letterSpacing: "0.1em",
-            borderRadius: 2,
-            backgroundColor: value === o.value ? "var(--color-paper)" : "transparent",
-            color: value === o.value ? "var(--color-ink)" : "var(--color-text-ghost)",
-            border: `1px solid ${value === o.value ? "var(--color-paper)" : "var(--color-line)"}`,
-          }}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export function SettingsForm() {
   const router = useRouter();
   const { data: profile, isLoading } = useProfile();
@@ -108,24 +83,7 @@ export function SettingsForm() {
   const [saved,      setSaved]      = useState(false);
   const [saveError,  setSaveError]  = useState<string | null>(null);
 
-  const [heightUnit, setHeightUnit] = useState<"metric" | "imperial">(() => {
-    if (typeof window === "undefined") return "metric";
-    return (localStorage.getItem("settings_heightUnit") as "metric" | "imperial") ?? "metric";
-  });
-  const [weightUnit, setWeightUnit] = useState<"kg" | "lbs">(() => {
-    if (typeof window === "undefined") return "kg";
-    return (localStorage.getItem("settings_weightUnit") as "kg" | "lbs") ?? "kg";
-  });
-  const weightUnitRef = useRef(weightUnit);
-
-  useEffect(() => {
-    weightUnitRef.current = weightUnit;
-    localStorage.setItem("settings_weightUnit", weightUnit);
-  }, [weightUnit]);
-
-  useEffect(() => {
-    localStorage.setItem("settings_heightUnit", heightUnit);
-  }, [heightUnit]);
+  // Imperial-only across the app (ft/in + lbs). DB stores cm/kg; convert at display/entry.
 
   useEffect(() => {
     if (profile) {
@@ -136,37 +94,18 @@ export function SettingsForm() {
       // The measurement log is the source of truth for "current" weight once one exists;
       // the profile field is only the fallback for accounts with no logged entries yet.
       const kg = measurements?.[0]?.weight_kg ?? profile.weight_kg ?? 0;
-      setWeight(
-        kg
-          ? weightUnitRef.current === "lbs"
-            ? String(Math.round(kg * 2.20462 * 10) / 10)
-            : String(kg)
-          : ""
-      );
+      setWeight(kg ? String(Math.round(kg * 2.20462 * 10) / 10) : "");
       setActivity((profile.activity_level as ActivityLevel) ?? "moderately_active");
       setGoal((profile.goal as FitnessGoal) ?? "build_muscle");
     }
   }, [profile, measurements]);
-
-  function handleWeightUnitChange(unit: string) {
-    const u = unit as "kg" | "lbs";
-    const current = parseFloat(weight);
-    if (current && !isNaN(current)) {
-      if (u === "lbs" && weightUnit === "kg") {
-        setWeight(String(Math.round(current * 2.20462 * 10) / 10));
-      } else if (u === "kg" && weightUnit === "lbs") {
-        setWeight(String(Math.round((current / 2.20462) * 10) / 10));
-      }
-    }
-    setWeightUnit(u);
-  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!profile) return;
     setSaveError(null);
     const rawWeight = parseFloat(weight);
-    const weightKg  = rawWeight ? Math.round((weightUnit === "lbs" ? rawWeight / 2.20462 : rawWeight) * 10) / 10 : null;
+    const weightKg  = rawWeight ? Math.round((rawWeight / 2.20462) * 10) / 10 : null;
     const currentKnownWeightKg = measurements?.[0]?.weight_kg ?? profile.weight_kg ?? null;
     const weightChanged = weightKg !== null &&
       (currentKnownWeightKg === null || Math.abs(weightKg - currentKnownWeightKg) > 0.05);
@@ -282,39 +221,23 @@ export function SettingsForm() {
         {/* Body stats */}
         <Section fig="Spec B — Biometrics" title="BODY STATS">
           <FieldRow label="Height">
-            <div className="flex items-center justify-between mb-2">
-              <span />
-              <UnitToggle
-                options={[{ value: "metric", label: "CM" }, { value: "imperial", label: "FT·IN" }]}
-                value={heightUnit}
-                onChange={(v) => setHeightUnit(v as "metric" | "imperial")}
-              />
-            </div>
-            <HeightInput valueCm={height} onChange={setHeight} unit={heightUnit} />
+            <HeightInput valueCm={height} onChange={setHeight} />
           </FieldRow>
 
           <FieldRow label="Body weight">
-            <div className="flex items-center justify-between mb-2">
-              <span />
-              <UnitToggle
-                options={[{ value: "kg", label: "KG" }, { value: "lbs", label: "LBS" }]}
-                value={weightUnit}
-                onChange={handleWeightUnitChange}
-              />
-            </div>
             <div className="flex items-center gap-2">
               <input
                 type="number"
                 step="0.1"
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
-                placeholder={weightUnit === "lbs" ? "e.g. 176" : "e.g. 80"}
+                placeholder="e.g. 176"
                 style={MONO_INPUT}
                 onFocus={(e) => (e.target.style.borderColor = "var(--color-paper)")}
                 onBlur={(e)  => (e.target.style.borderColor = "var(--color-line)")}
               />
               <span style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--color-text-ghost)", whiteSpace: "nowrap" }}>
-                {weightUnit}
+                lbs
               </span>
             </div>
           </FieldRow>

@@ -1,17 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
-
 export type WeightUnit = "kg" | "lbs";
 
+// Weight is lbs-only across the app. The database always stores kg; conversion
+// happens only at the display/entry layer (toKg / fromKg / formatKg below).
+// Kept as a hook-shaped API so existing call sites need no changes.
 export function useWeightUnit(): { unit: WeightUnit; label: string } {
-  const [unit, setUnit] = useState<WeightUnit>("kg");
-
-  useEffect(() => {
-    setUnit((localStorage.getItem("settings_weightUnit") as WeightUnit) ?? "kg");
-  }, []);
-
-  return { unit, label: unit === "lbs" ? "LBS" : "KG" };
+  return { unit: "lbs", label: "LBS" };
 }
 
 export function toKg(value: number, unit: WeightUnit): number {

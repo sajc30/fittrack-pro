@@ -14,6 +14,7 @@ export interface ActiveExercise {
   exerciseId: string;
   exerciseName: string;
   muscleGroup: string;
+  equipment: string;
   sets: ActiveSet[];
 }
 
@@ -24,19 +25,16 @@ interface ActiveWorkoutState {
   startedAt: string | null;
   exercises: ActiveExercise[];
   currentExerciseIndex: number;
-  /** Epoch ms when the current rest period ends; null when not resting. */
-  restEndsAt: number | null;
 
   // Actions
   startWorkout: (id: string, name: string) => void;
-  addExercise: (exercise: Omit<ActiveExercise, "sets">) => void;
+  /** initialWeight prefills the exercise's first set — used to default bodyweight load. */
+  addExercise: (exercise: Omit<ActiveExercise, "sets">, initialWeight?: string) => void;
   removeExercise: (index: number) => void;
   addSet: (exerciseIndex: number) => void;
   updateSet: (exerciseIndex: number, setIndex: number, updates: Partial<ActiveSet>) => void;
   markSetLogged: (exerciseIndex: number, setIndex: number, isPR: boolean) => void;
   setCurrentExercise: (index: number) => void;
-  startRest: (seconds: number) => void;
-  clearRest: () => void;
   resetWorkout: () => void;
 }
 
@@ -57,16 +55,15 @@ export const useActiveWorkout = create<ActiveWorkoutState>()(
       startedAt: null,
       exercises: [],
       currentExerciseIndex: 0,
-      restEndsAt: null,
 
       startWorkout: (id, name) =>
         set({ workoutId: id, workoutName: name, startedAt: new Date().toISOString() }),
 
-      addExercise: (exercise) =>
+      addExercise: (exercise, initialWeight) =>
         set((state) => ({
           exercises: [
             ...state.exercises,
-            { ...exercise, sets: [makeSet()] },
+            { ...exercise, sets: [{ ...makeSet(), weight: initialWeight ?? "" }] },
           ],
           currentExerciseIndex: state.exercises.length,
         })),
@@ -117,10 +114,6 @@ export const useActiveWorkout = create<ActiveWorkoutState>()(
 
       setCurrentExercise: (index) => set({ currentExerciseIndex: index }),
 
-      startRest: (seconds) => set({ restEndsAt: Date.now() + seconds * 1000 }),
-
-      clearRest: () => set({ restEndsAt: null }),
-
       resetWorkout: () =>
         set({
           workoutId: null,
@@ -128,7 +121,6 @@ export const useActiveWorkout = create<ActiveWorkoutState>()(
           startedAt: null,
           exercises: [],
           currentExerciseIndex: 0,
-          restEndsAt: null,
         }),
     }),
     { name: "fittrack-active-workout" }
