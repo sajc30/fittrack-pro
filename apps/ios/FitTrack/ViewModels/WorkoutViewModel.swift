@@ -142,6 +142,80 @@ final class WorkoutViewModel {
             self.error = error.localizedDescription
         }
     }
+
+    // ── Editing logged sessions (revision mode) ───────────────────────
+    // PRs are recomputed by Postgres triggers on any workout_sets change,
+    // so callers should reload workouts afterwards to pick up fresh is_pr flags.
+
+    func renameWorkout(_ id: UUID, name: String) async {
+        do {
+            try await supabase
+                .from("workouts")
+                .update(["name": name])
+                .eq("id", value: id.uuidString)
+                .execute()
+            if let i = workouts.firstIndex(where: { $0.id == id }) { workouts[i].name = name }
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func deleteWorkout(_ id: UUID) async {
+        do {
+            try await supabase
+                .from("workouts")
+                .delete()
+                .eq("id", value: id.uuidString)
+                .execute()
+            workouts.removeAll { $0.id == id }
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func updateSet(_ id: UUID, weightKg: Double, reps: Int, setNumber: Int) async {
+        do {
+            try await supabase
+                .from("workout_sets")
+                .update(UpdateSetPayload(weightKg: weightKg, reps: reps, setNumber: setNumber))
+                .eq("id", value: id.uuidString)
+                .execute()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func deleteSet(_ id: UUID) async {
+        do {
+            try await supabase
+                .from("workout_sets")
+                .delete()
+                .eq("id", value: id.uuidString)
+                .execute()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    // Add a set to an already-logged session (the "forgot to log it" case).
+    func addSet(workoutId: UUID, exerciseId: UUID, weightKg: Double, reps: Int, setNumber: Int) async {
+        do {
+            let payload = LogSetPayload(
+                workoutId: workoutId.uuidString,
+                exerciseId: exerciseId.uuidString,
+                setNumber: setNumber,
+                weightKg: weightKg,
+                reps: reps,
+                loggedAt: ISO8601DateFormatter().string(from: Date())
+            )
+            try await supabase
+                .from("workout_sets")
+                .insert(payload)
+                .execute()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
 }
 
 // Typed payload avoids PostgREST rejecting numeric fields sent as strings
@@ -160,5 +234,18 @@ private struct LogSetPayload: Encodable {
         case weightKg   = "weight_kg"
         case reps
         case loggedAt   = "logged_at"
+    }
+}
+
+// Partial update of an existing set's load/reps/order.
+private struct UpdateSetPayload: Encodable {
+    let weightKg: Double
+    let reps: Int
+    let setNumber: Int
+
+    enum CodingKeys: String, CodingKey {
+        case weightKg  = "weight_kg"
+        case reps
+        case setNumber = "set_number"
     }
 }

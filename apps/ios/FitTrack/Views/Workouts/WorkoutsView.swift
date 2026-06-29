@@ -4,6 +4,11 @@ struct WorkoutsView: View {
     @Environment(AuthViewModel.self)    private var auth
     @Environment(WorkoutViewModel.self) private var workout
 
+    @State private var showNamePrompt = false
+    @State private var newSessionName = ""
+
+    private var defaultSessionName: String { String(format: "Session %03d", workout.workouts.count + 1) }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -23,8 +28,8 @@ struct WorkoutsView: View {
                             }
                             Spacer()
                             Button {
-                                let name = String(format: "Session %03d", workout.workouts.count + 1)
-                                Task { await workout.beginWorkout(userId: auth.session!.user.id, name: name) }
+                                newSessionName = defaultSessionName
+                                showNamePrompt = true
                             } label: {
                                 Text("+ BEGIN")
                                     .font(.blueprint(11, weight: .semibold))
@@ -62,7 +67,7 @@ struct WorkoutsView: View {
                         } else {
                             ForEach(Array(workout.workouts.enumerated()), id: \.element.id) { i, w in
                                 NavigationLink {
-                                    WorkoutDetailView(workout: w, sessionNumber: workout.workouts.count - i)
+                                    WorkoutDetailView(workoutId: w.id, sessionNumber: workout.workouts.count - i)
                                 } label: {
                                     SessionCard(workout: w, sessionNumber: workout.workouts.count - i)
                                 }
@@ -81,6 +86,18 @@ struct WorkoutsView: View {
         .task {
             guard let uid = auth.session?.user.id else { return }
             await workout.loadWorkouts(userId: uid)
+        }
+        .alert("New session", isPresented: $showNamePrompt) {
+            TextField("Session name", text: $newSessionName)
+            Button("Cancel", role: .cancel) {}
+            Button("Begin") {
+                let trimmed = newSessionName.trimmingCharacters(in: .whitespaces)
+                let name = trimmed.isEmpty ? defaultSessionName : trimmed
+                guard let uid = auth.session?.user.id else { return }
+                Task { await workout.beginWorkout(userId: uid, name: name) }
+            }
+        } message: {
+            Text("Name this session, or keep the default.")
         }
     }
 }
