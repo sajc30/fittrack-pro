@@ -1,4 +1,5 @@
 import SwiftUI
+import AuthenticationServices
 
 struct AuthView: View {
     @State private var isSignUp = false
@@ -34,6 +35,8 @@ struct AuthView: View {
                             }
                             .padding(.bottom, 4)
                             Divider().background(Color.bpLine)
+
+                            SocialAuthSection()
 
                             if isSignUp {
                                 SignUpFormContent()
@@ -193,6 +196,94 @@ struct SignUpFormContent: View {
                 self.error = error.localizedDescription
             }
             isLoading = false
+        }
+    }
+}
+
+// ── Social Sign-In (Apple + Google) ──────────────────────────────────
+struct SocialAuthSection: View {
+    @Environment(AuthViewModel.self) private var auth
+    @State private var appleNonce = ""
+    @State private var googleLoading = false
+    @State private var error: String?
+
+    var body: some View {
+        VStack(spacing: 12) {
+            SignInWithAppleButton(.continue) { request in
+                let nonce = randomNonceString()
+                appleNonce = nonce
+                request.requestedScopes = [.fullName, .email]
+                request.nonce = sha256(nonce)
+            } onCompletion: { result in
+                handleApple(result)
+            }
+            .signInWithAppleButtonStyle(.white)
+            .frame(height: 44)
+            .clipShape(RoundedRectangle(cornerRadius: 2))
+
+            Button(action: signInWithGoogle) {
+                HStack(spacing: 8) {
+                    if googleLoading {
+                        ProgressView().tint(Color.bpInk)
+                    } else {
+                        Text("G").font(.system(size: 15, weight: .bold))
+                    }
+                    Text("CONTINUE WITH GOOGLE")
+                        .font(.blueprint(12, weight: .semibold))
+                        .tracking(1)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(Color.bpPaper)
+                .foregroundStyle(Color.bpInk)
+                .clipShape(RoundedRectangle(cornerRadius: 2))
+            }
+            .disabled(googleLoading)
+
+            if let error {
+                Text("✕ \(error)")
+                    .font(.blueprint(11))
+                    .foregroundStyle(Color.bpRedline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            HStack(spacing: 10) {
+                Rectangle().fill(Color.bpLine).frame(height: 1)
+                Text("OR").figLabel(size: 9)
+                Rectangle().fill(Color.bpLine).frame(height: 1)
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
+    private func handleApple(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let authResult):
+            guard let cred = authResult.credential as? ASAuthorizationAppleIDCredential,
+                  let tokenData = cred.identityToken,
+                  let idToken = String(data: tokenData, encoding: .utf8) else {
+                error = "Apple sign-in failed."
+                return
+            }
+            Task {
+                do { try await auth.signInWithApple(idToken: idToken, nonce: appleNonce) }
+                catch { self.error = error.localizedDescription }
+            }
+        case .failure(let err):
+            // Ignore user-cancelled; surface real errors.
+            if (err as NSError).code != ASAuthorizationError.canceled.rawValue {
+                error = err.localizedDescription
+            }
+        }
+    }
+
+    private func signInWithGoogle() {
+        googleLoading = true
+        error = nil
+        Task {
+            do { try await auth.signInWithGoogle() }
+            catch { self.error = error.localizedDescription }
+            googleLoading = false
         }
     }
 }

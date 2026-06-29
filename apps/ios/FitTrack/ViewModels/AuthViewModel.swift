@@ -1,5 +1,21 @@
 import SwiftUI
 import Supabase
+import CryptoKit
+
+// Custom URL scheme used for the Google OAuth (ASWebAuthenticationSession) redirect.
+// Must match a CFBundleURLScheme in Info.plist and the redirect URL allow-list in Supabase Auth.
+let oauthRedirectURL = URL(string: "com.sajandeepcheema.fittrack://auth-callback")!
+
+/// Random nonce for Sign in with Apple. The raw value is sent to Supabase; its SHA256
+/// hash is sent to Apple in the authorization request.
+func randomNonceString(length: Int = 32) -> String {
+    let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-._")
+    return String((0..<length).map { _ in charset.randomElement()! })
+}
+
+func sha256(_ input: String) -> String {
+    SHA256.hash(data: Data(input.utf8)).map { String(format: "%02x", $0) }.joined()
+}
 
 @MainActor
 @Observable
@@ -33,6 +49,20 @@ final class AuthViewModel {
             password: password,
             data: ["full_name": AnyJSON.string(name)]
         )
+    }
+
+    /// Native Sign in with Apple. The view obtains the identity token + raw nonce from
+    /// `ASAuthorizationAppleIDCredential`; we exchange it for a Supabase session.
+    func signInWithApple(idToken: String, nonce: String) async throws {
+        try await supabase.auth.signInWithIdToken(
+            credentials: .init(provider: .apple, idToken: idToken, nonce: nonce)
+        )
+    }
+
+    /// Google sign-in via Supabase OAuth. supabase-swift drives an ASWebAuthenticationSession
+    /// and returns to the app through `oauthRedirectURL`.
+    func signInWithGoogle() async throws {
+        try await supabase.auth.signInWithOAuth(provider: .google, redirectTo: oauthRedirectURL)
     }
 
     func signOut() async throws {

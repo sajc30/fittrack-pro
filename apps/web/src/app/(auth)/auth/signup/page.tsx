@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { SignupForm } from "@/components/auth/signup-form";
+import { OAuthButtons } from "@/components/auth/oauth-buttons";
 
 export const metadata: Metadata = { title: "Create Account" };
 
@@ -33,6 +34,7 @@ export default function SignupPage() {
             File a new drawing set.
           </p>
         </div>
+        <OAuthButtons />
         <SignupForm />
       </div>
     </div>
