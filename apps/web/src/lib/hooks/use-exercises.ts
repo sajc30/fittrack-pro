@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -37,6 +37,37 @@ export function useExercises(
       const { data, error } = await query;
       if (error) throw error;
       return data ?? [];
+    },
+  });
+}
+
+export function useCreateExercise() {
+  const supabase = createClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (exercise: {
+      name: string;
+      muscle_group: Database["public"]["Enums"]["muscle_group"];
+      secondary_muscles: Database["public"]["Enums"]["muscle_group"][];
+      equipment: Database["public"]["Enums"]["equipment_type"];
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // RLS requires BOTH user_id = auth.uid() AND is_custom = true — the
+      // insert is rejected if either is missing.
+      const { data, error } = await supabase
+        .from("exercises")
+        .insert({ ...exercise, is_custom: true, user_id: user.id })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exercises"] });
     },
   });
 }

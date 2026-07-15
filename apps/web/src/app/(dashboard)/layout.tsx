@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/layout/sidebar";
+import { ActiveSessionBanner } from "@/components/layout/active-session-banner";
 
 export default function DashboardLayout({
   children,
@@ -14,6 +15,7 @@ export default function DashboardLayout({
           {children}
         </div>
       </main>
+      <ActiveSessionBanner />
     </div>
   );
 }

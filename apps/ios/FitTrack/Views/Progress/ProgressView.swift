@@ -78,10 +78,9 @@ private struct StrengthCard: View {
     @Environment(WorkoutViewModel.self) private var workout
     @Binding var selectedExerciseId: UUID?
     @Binding var range: ProgressRangeOption
-    @AppStorage("settings_weightUnit") private var weightUnit: String = "kg"
     @State private var showExercisePicker = false
-    private var unitLabel: String { weightUnit == "lbs" ? "LBS" : "KG" }
-    private func displayWeight(_ kg: Double) -> Double { weightUnit == "lbs" ? kg * 2.20462 : kg }
+    private let unitLabel = "LBS"
+    private func displayWeight(_ kg: Double) -> Double { Units.toLbs(kg) }
 
     var body: some View {
         SheetCard {

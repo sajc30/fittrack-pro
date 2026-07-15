@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Plus, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useActiveWorkout } from "@/lib/store/active-workout";
 
 const navItems = [
   { href: "/dashboard", sheet: "01", label: "Dashboard" },
@@ -16,6 +18,12 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const year = new Date().getFullYear();
+  const workoutId = useActiveWorkout((s) => s.workoutId);
+
+  // Persisted store rehydrates after mount; render the neutral state until then.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+  const sessionActive = hydrated && workoutId !== null;
 
   return (
     <aside
@@ -35,14 +43,32 @@ export function Sidebar() {
         </p>
       </div>
 
-      {/* Begin session */}
+      {/* Begin / resume session */}
       <div className="px-4 pt-4 pb-2">
         <Link
           href="/workouts/new"
           className="bp-btn flex items-center justify-center gap-2 w-full py-2.5"
+          style={
+            sessionActive
+              ? { backgroundColor: "var(--color-redline)", color: "var(--color-ink)" }
+              : undefined
+          }
         >
-          <Plus className="w-3.5 h-3.5" />
-          Begin session
+          {sessionActive ? (
+            <>
+              <span
+                className="inline-flex w-2 h-2 shrink-0 animate-pulse"
+                style={{ backgroundColor: "var(--color-ink)", borderRadius: "50%" }}
+              />
+              Resume session
+              <ArrowRight className="w-3.5 h-3.5" />
+            </>
+          ) : (
+            <>
+              <Plus className="w-3.5 h-3.5" />
+              Begin session
+            </>
+          )}
         </Link>
       </div>
 

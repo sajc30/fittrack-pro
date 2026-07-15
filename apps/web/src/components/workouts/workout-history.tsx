@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useWeightUnit, formatKg } from "@/lib/hooks/use-weight-unit";
+import { useWeightUnit, formatKg, fromKg, toKg } from "@/lib/hooks/use-weight-unit";
 import {
   useWorkouts,
   useDeleteWorkout,
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { formatWorkoutDate } from "@fittrack/shared";
 import { MUSCLE_GROUP_LABELS } from "@fittrack/shared";
+import { ExercisePicker } from "./exercise-picker";
 import type { Database } from "@/lib/supabase/database.types";
 
 type MuscleGroup = Database["public"]["Enums"]["muscle_group"];
@@ -62,6 +63,7 @@ function EditExerciseBlock({
   onAddSet,
   onChangeSet,
   onMarkDelete,
+  onDeleteExercise,
 }: {
   exerciseName: string;
   muscle: string;
@@ -69,6 +71,7 @@ function EditExerciseBlock({
   onAddSet: () => void;
   onChangeSet: (idx: number, field: "weight" | "reps", value: string) => void;
   onMarkDelete: (idx: number) => void;
+  onDeleteExercise: () => void;
 }) {
   const { label } = useWeightUnit();
   const inputStyle = {
@@ -96,6 +99,21 @@ function EditExerciseBlock({
         <span className="label-caps" style={{ fontSize: 11 }}>
           {MUSCLE_GROUP_LABELS[muscle as MuscleGroup] ?? muscle}
         </span>
+        <button
+          onClick={onDeleteExercise}
+          className="ml-auto flex items-center gap-1.5 px-2 py-1 transition-all hover:bg-[color-mix(in_srgb,var(--color-redline)_10%,transparent)]"
+          style={{
+            color: "var(--color-redline)",
+            border: "1px solid color-mix(in srgb, var(--color-redline) 40%, transparent)",
+            borderRadius: 2,
+            fontSize: 10,
+            fontFamily: "var(--font-mono)",
+            letterSpacing: "0.1em",
+          }}
+          title="Strike every set of this exercise"
+        >
+          <Trash2 className="w-3 h-3" /> STRIKE ALL
+        </button>
       </div>
 
       {/* Column headers */}
@@ -183,9 +201,11 @@ function EditWorkoutPanel({
   const updateSet  = useUpdateSet();
   const deleteSet  = useDeleteSet();
   const logSet     = useLogSet();
+  const { unit }   = useWeightUnit();
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
 
   // Build draft state grouped by exercise
   type ExBlock = {
@@ -209,7 +229,8 @@ function EditWorkoutPanel({
       map[s.exercise_id].sets.push({
         id: s.id,
         set_number: s.set_number,
-        weight: String(s.weight_kg ?? ""),
+        // Inputs work in the display unit (lbs); the DB stores kg.
+        weight: s.weight_kg != null ? String(Math.round(fromKg(s.weight_kg, unit) * 10) / 10) : "",
         reps: String(s.reps ?? ""),
         is_pr: s.is_pr,
         toDelete: false,
@@ -264,6 +285,49 @@ function EditWorkoutPanel({
     );
   }
 
+  function handleDeleteExercise(blockIdx: number) {
+    setBlocks((bs) =>
+      bs.map((b, i) =>
+        i !== blockIdx ? b : { ...b, sets: b.sets.map((s) => ({ ...s, toDelete: true })) }
+      )
+    );
+  }
+
+  function handleAddExercise(ex: { id: string; name: string; muscle_group: string }) {
+    setShowPicker(false);
+    setBlocks((bs) => {
+      const existing = bs.findIndex((b) => b.exerciseId === ex.id);
+      if (existing !== -1) {
+        const prev = bs[existing].sets.filter((s) => !s.toDelete).at(-1);
+        return bs.map((b, i) =>
+          i !== existing ? b : {
+            ...b,
+            sets: [
+              ...b.sets,
+              {
+                id: null,
+                set_number: b.sets.filter((s) => !s.toDelete).length + 1,
+                weight: prev?.weight ?? "",
+                reps: prev?.reps ?? "",
+                is_pr: false,
+                toDelete: false,
+              },
+            ],
+          }
+        );
+      }
+      return [
+        ...bs,
+        {
+          exerciseId: ex.id,
+          name: ex.name,
+          muscle: ex.muscle_group,
+          sets: [{ id: null, set_number: 1, weight: "", reps: "", is_pr: false, toDelete: false }],
+        },
+      ];
+    });
+  }
+
   async function handleSave() {
     setSaving(true);
     setSaveError(null);
@@ -285,8 +349,9 @@ function EditWorkoutPanel({
         // Renumber by position so set numbers stay gapless after deletes
         const setNum = activeSets.indexOf(s) + 1;
 
+        const weightKg = toKg(w, unit);
         if (s.id) {
-          ops.push(updateSet.mutateAsync({ setId: s.id, weight_kg: w, reps: r, set_number: setNum }));
+          ops.push(updateSet.mutateAsync({ setId: s.id, weight_kg: weightKg, reps: r, set_number: setNum }));
         } else {
           ops.push(
             logSet.mutateAsync({
@@ -294,7 +359,7 @@ function EditWorkoutPanel({
               exercise_id: block.exerciseId,
               set_number: setNum,
               reps: r,
-              weight_kg: w,
+              weight_kg: weightKg,
               is_pr: false,
             })
           );
@@ -373,10 +438,25 @@ function EditWorkoutPanel({
               onAddSet={() => handleAddSet(blockIdx)}
               onChangeSet={(si, f, v) => handleChangeSet(blockIdx, si, f, v)}
               onMarkDelete={(si) => handleMarkDelete(blockIdx, si)}
+              onDeleteExercise={() => handleDeleteExercise(blockIdx)}
             />
           );
         })}
+
+        <button
+          onClick={() => setShowPicker(true)}
+          className="bp-btn-outline flex items-center gap-1.5 px-3 py-2"
+        >
+          <Plus className="w-3.5 h-3.5" /> Add exercise
+        </button>
       </div>
+
+      {showPicker && (
+        <ExercisePicker
+          onSelect={(ex) => handleAddExercise(ex)}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
     </div>
   );
 }

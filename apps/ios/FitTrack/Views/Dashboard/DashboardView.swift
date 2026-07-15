@@ -52,9 +52,9 @@ struct DashboardView: View {
     }
 
     @State private var showSettings = false
-    @AppStorage("settings_weightUnit") private var weightUnit: String = "kg"
-    private var unitLabel: String { weightUnit == "lbs" ? "LBS" : "KG" }
-    private func displayWeight(_ kg: Double) -> Double { weightUnit == "lbs" ? kg * 2.20462 : kg }
+    @State private var showNamePrompt = false
+    private let unitLabel = "LBS"
+    private func displayWeight(_ kg: Double) -> Double { Units.toLbs(kg) }
 
     var body: some View {
         NavigationStack {
@@ -94,8 +94,11 @@ struct DashboardView: View {
                                 }
                                 Spacer()
                                 Button {
-                                    let name = String(format: "Session %03d", workout.workouts.count + 1)
-                                    Task { await workout.beginWorkout(userId: auth.session!.user.id, name: name) }
+                                    if workout.isWorkoutActive {
+                                        workout.showActiveSession = true
+                                    } else {
+                                        showNamePrompt = true
+                                    }
                                 } label: {
                                     Text(workout.isWorkoutActive ? "OPEN" : "+ BEGIN")
                                         .font(.blueprint(11, weight: .semibold))
@@ -283,6 +286,7 @@ struct DashboardView: View {
             await workout.loadPRs(userId: uid)
             if workout.workouts.isEmpty { await workout.loadWorkouts(userId: uid) }
         }
+        .beginSessionPrompt(isPresented: $showNamePrompt)
     }
 
     private var greeting: String {

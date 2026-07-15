@@ -5,9 +5,6 @@ struct WorkoutsView: View {
     @Environment(WorkoutViewModel.self) private var workout
 
     @State private var showNamePrompt = false
-    @State private var newSessionName = ""
-
-    private var defaultSessionName: String { String(format: "Session %03d", workout.workouts.count + 1) }
 
     var body: some View {
         NavigationStack {
@@ -28,10 +25,13 @@ struct WorkoutsView: View {
                             }
                             Spacer()
                             Button {
-                                newSessionName = defaultSessionName
-                                showNamePrompt = true
+                                if workout.isWorkoutActive {
+                                    workout.showActiveSession = true
+                                } else {
+                                    showNamePrompt = true
+                                }
                             } label: {
-                                Text("+ BEGIN")
+                                Text(workout.isWorkoutActive ? "OPEN" : "+ BEGIN")
                                     .font(.blueprint(11, weight: .semibold))
                                     .tracking(2)
                                     .padding(.horizontal, 12).padding(.vertical, 8)
@@ -87,18 +87,7 @@ struct WorkoutsView: View {
             guard let uid = auth.session?.user.id else { return }
             await workout.loadWorkouts(userId: uid)
         }
-        .alert("New session", isPresented: $showNamePrompt) {
-            TextField("Session name", text: $newSessionName)
-            Button("Cancel", role: .cancel) {}
-            Button("Begin") {
-                let trimmed = newSessionName.trimmingCharacters(in: .whitespaces)
-                let name = trimmed.isEmpty ? defaultSessionName : trimmed
-                guard let uid = auth.session?.user.id else { return }
-                Task { await workout.beginWorkout(userId: uid, name: name) }
-            }
-        } message: {
-            Text("Name this session, or keep the default.")
-        }
+        .beginSessionPrompt(isPresented: $showNamePrompt)
     }
 }
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useMeasurements } from "@/lib/hooks/use-measurements";
 
 function kgToLbs(kg: number) { return Math.round(kg * 2.20462 * 10) / 10; }
@@ -11,24 +10,18 @@ const PAD = 5;
 
 export function WeightTrendSparkline() {
   const { data: measurements, isLoading } = useMeasurements();
-  const [weightUnit, setWeightUnit] = useState<"kg" | "lbs">("kg");
 
-  useEffect(() => {
-    setWeightUnit((localStorage.getItem("settings_weightUnit") as "kg" | "lbs") ?? "kg");
-  }, []);
-
-  const convert = (kg: number) => weightUnit === "lbs" ? kgToLbs(kg) : kg;
-
+  // Lbs-only across the app; the DB stores kg.
   const weights = (measurements ?? [])
     .filter((m) => m.weight_kg !== null)
     .slice(0, 12)
     .reverse()
-    .map((m) => convert(m.weight_kg as number));
+    .map((m) => kgToLbs(m.weight_kg as number));
 
   const latest = weights.at(-1) ?? null;
   const first  = weights.at(0) ?? null;
   const diff   = latest !== null && first !== null ? Math.round((latest - first) * 10) / 10 : null;
-  const unit   = weightUnit === "lbs" ? "lbs" : "kg";
+  const unit   = "lbs";
 
   // Plot points across the viewBox; flat data sits on the centerline
   const min = Math.min(...weights);

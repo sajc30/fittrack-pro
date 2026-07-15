@@ -7,10 +7,9 @@ struct WorkoutDetailView: View {
     @Environment(WorkoutViewModel.self) private var vm
     @Environment(\.dismiss) private var dismiss
 
-    @AppStorage("settings_weightUnit") private var weightUnit: String = "kg"
-    private var unitLabel: String { weightUnit == "lbs" ? "LBS" : "KG" }
-    private func displayWeight(_ kg: Double) -> Double { weightUnit == "lbs" ? kg * 2.20462 : kg }
-    private func toKg(_ shown: Double) -> Double { weightUnit == "lbs" ? shown / 2.20462 : shown }
+    private let unitLabel = "LBS"
+    private func displayWeight(_ kg: Double) -> Double { Units.toLbs(kg) }
+    private func toKg(_ shown: Double) -> Double { Units.toKg(shown) }
 
     // Editing state (revision mode)
     @State private var isEditing = false
@@ -19,6 +18,8 @@ struct WorkoutDetailView: View {
     @State private var showRename = false
     @State private var renameText = ""
     @State private var showDeleteConfirm = false
+    @State private var showAddExercise = false
+    @State private var addExerciseSelection: Exercise?
 
     // Live workout pulled from the VM so edits/reloads reflect immediately.
     private var workout: Workout? { vm.workouts.first { $0.id == workoutId } }
@@ -41,6 +42,20 @@ struct WorkoutDetailView: View {
             Button("Save") {
                 let n = renameText.trimmingCharacters(in: .whitespaces)
                 if !n.isEmpty { Task { await vm.renameWorkout(workoutId, name: n) } }
+            }
+        }
+        .sheet(isPresented: $showAddExercise) {
+            ExercisePickerSheet(selected: $addExerciseSelection)
+        }
+        .onChange(of: addExerciseSelection) { _, ex in
+            guard let ex else { return }
+            addExerciseSelection = nil
+            if let gi = drafts.firstIndex(where: { $0.id == ex.id }) {
+                let last = drafts[gi].sets.last { !$0.toDelete }
+                drafts[gi].sets.append(DraftSet(setId: nil, weight: last?.weight ?? "", reps: last?.reps ?? ""))
+            } else {
+                drafts.append(DraftGroup(id: ex.id, name: ex.name, muscleGroup: ex.muscleGroup,
+                                         sets: [DraftSet(setId: nil, weight: "", reps: "")]))
             }
         }
         .confirmationDialog(
@@ -67,9 +82,24 @@ struct WorkoutDetailView: View {
 
                 if isEditing {
                     ForEach(drafts.indices, id: \.self) { gi in
-                        EditableExerciseCard(group: $drafts[gi], unitLabel: unitLabel)
-                            .padding(.horizontal, 20)
+                        // A group whose every set is struck is deleted wholesale — hide it.
+                        if !drafts[gi].sets.allSatisfy(\.toDelete) {
+                            EditableExerciseCard(group: $drafts[gi], unitLabel: unitLabel)
+                                .padding(.horizontal, 20)
+                        }
                     }
+
+                    Button { showAddExercise = true } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus").font(.system(size: 11, weight: .bold))
+                            Text("ADD EXERCISE").font(.blueprint(11, weight: .semibold)).tracking(1)
+                        }
+                        .foregroundStyle(Color.bpPaper)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLine, lineWidth: 1))
+                    }
+                    .padding(.horizontal, 20)
                 } else if groups.isEmpty {
                     SheetCard {
                         Text("No sets on record for this session.")
@@ -329,6 +359,18 @@ fileprivate struct EditableExerciseCard: View {
                         .foregroundStyle(Color.bpTextPrimary)
                     Text(muscleGroupLabel)
                         .figLabel(size: 9)
+                    Spacer()
+                    Button {
+                        for si in group.sets.indices { group.sets[si].toDelete = true }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "trash").font(.system(size: 11))
+                            Text("STRIKE ALL").font(.blueprint(9, weight: .semibold)).tracking(1)
+                        }
+                        .foregroundStyle(Color.bpRedline)
+                        .padding(.horizontal, 6).padding(.vertical, 4)
+                        .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpRedline.opacity(0.4), lineWidth: 1))
+                    }
                 }
                 Divider().background(Color.bpLine)
 

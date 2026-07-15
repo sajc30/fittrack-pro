@@ -3,6 +3,8 @@ import { persist } from "zustand/middleware";
 
 export interface ActiveSet {
   tempId: string;
+  /** workout_sets row id once logged — null until then (and for sets persisted before this field existed). */
+  dbId: string | null;
   reps: string;
   weight: string;
   rpe: string;
@@ -32,14 +34,16 @@ interface ActiveWorkoutState {
   addExercise: (exercise: Omit<ActiveExercise, "sets">, initialWeight?: string) => void;
   removeExercise: (index: number) => void;
   addSet: (exerciseIndex: number) => void;
+  removeSet: (exerciseIndex: number, setIndex: number) => void;
   updateSet: (exerciseIndex: number, setIndex: number, updates: Partial<ActiveSet>) => void;
-  markSetLogged: (exerciseIndex: number, setIndex: number, isPR: boolean) => void;
+  markSetLogged: (exerciseIndex: number, setIndex: number, isPR: boolean, dbId: string) => void;
   setCurrentExercise: (index: number) => void;
   resetWorkout: () => void;
 }
 
 const makeSet = (): ActiveSet => ({
   tempId: Math.random().toString(36).slice(2),
+  dbId: null,
   reps: "",
   weight: "",
   rpe: "",
@@ -88,6 +92,16 @@ export const useActiveWorkout = create<ActiveWorkoutState>()(
           return { exercises };
         }),
 
+      removeSet: (exerciseIndex, setIndex) =>
+        set((state) => {
+          const exercises = [...state.exercises];
+          exercises[exerciseIndex] = {
+            ...exercises[exerciseIndex],
+            sets: exercises[exerciseIndex].sets.filter((_, i) => i !== setIndex),
+          };
+          return { exercises };
+        }),
+
       updateSet: (exerciseIndex, setIndex, updates) =>
         set((state) => {
           const exercises = [...state.exercises];
@@ -100,13 +114,13 @@ export const useActiveWorkout = create<ActiveWorkoutState>()(
           return { exercises };
         }),
 
-      markSetLogged: (exerciseIndex, setIndex, isPR) =>
+      markSetLogged: (exerciseIndex, setIndex, isPR, dbId) =>
         set((state) => {
           const exercises = [...state.exercises];
           exercises[exerciseIndex] = {
             ...exercises[exerciseIndex],
             sets: exercises[exerciseIndex].sets.map((s, i) =>
-              i === setIndex ? { ...s, logged: true, isPR } : s
+              i === setIndex ? { ...s, logged: true, isPR, dbId } : s
             ),
           };
           return { exercises };
@@ -123,6 +137,21 @@ export const useActiveWorkout = create<ActiveWorkoutState>()(
           currentExerciseIndex: 0,
         }),
     }),
-    { name: "fittrack-active-workout" }
+    {
+      name: "fittrack-active-workout",
+      version: 1,
+      // Sets persisted before `dbId` existed get null — edit/delete affordances
+      // stay hidden for them rather than erroring on a missing row id.
+      migrate: (persisted) => {
+        const state = persisted as ActiveWorkoutState;
+        return {
+          ...state,
+          exercises: (state.exercises ?? []).map((ex) => ({
+            ...ex,
+            sets: ex.sets.map((s) => ({ ...s, dbId: s.dbId ?? null })),
+          })),
+        };
+      },
+    }
   )
 );

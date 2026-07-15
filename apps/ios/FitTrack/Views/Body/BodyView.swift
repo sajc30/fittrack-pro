@@ -8,8 +8,6 @@ struct BodyView: View {
 
     @State private var showLogWeight  = false
     @State private var weightInput    = ""
-    @State private var imperialWeight = UserDefaults.standard.bool(forKey: "settings_imperialWeight")
-    @State private var imperialHeight = UserDefaults.standard.bool(forKey: "settings_imperialHeight")
     @State private var isSaving       = false
     @State private var saveError: String?
 
@@ -27,16 +25,13 @@ struct BodyView: View {
         return result
     }
 
-    private var weightUnit: String { imperialWeight ? "LBS" : "KG" }
+    private var weightUnit: String { "LBS" }
 
     private func displayWeight(_ kg: Double) -> String {
-        imperialWeight
-            ? String(format: "%.1f", kg * 2.20462)
-            : String(format: "%.1f", kg)
+        String(format: "%.1f", Units.toLbs(kg))
     }
 
     private func displayHeight(_ cm: Double) -> String {
-        guard imperialHeight else { return String(format: "%.0f CM", cm) }
         let totalInches = cm / 2.54
         let ft = Int(totalInches / 12)
         let inches = Int(totalInches.truncatingRemainder(dividingBy: 12).rounded())
@@ -92,13 +87,9 @@ struct BodyView: View {
                                                 .foregroundStyle(Color.bpTextSecondary)
                                         }
                                     }
-                                    HStack(spacing: 8) {
-                                        BPChip(label: "KG",  isActive: !imperialWeight) { imperialWeight = false }
-                                        BPChip(label: "LBS", isActive: imperialWeight)  { imperialWeight = true  }
-                                    }
                                     HStack(spacing: 10) {
                                         BPTextField(
-                                            placeholder: imperialWeight ? "e.g. 185.0" : "e.g. 84.0",
+                                            placeholder: "e.g. 185.0",
                                             text: $weightInput
                                         )
                                         .keyboardType(.decimalPad)
@@ -199,10 +190,6 @@ struct BodyView: View {
             .navigationBarHidden(true)
         }
         .dismissesKeyboardOnTap()
-        .onAppear {
-            imperialWeight = UserDefaults.standard.bool(forKey: "settings_imperialWeight")
-            imperialHeight = UserDefaults.standard.bool(forKey: "settings_imperialHeight")
-        }
         .task {
             guard let uid = auth.session?.user.id else { return }
             if profile.measurements.isEmpty { await profile.loadMeasurements(userId: uid) }
@@ -213,13 +200,13 @@ struct BodyView: View {
     private var weightPoints: [(date: Date, weight: Double)] {
         profile.measurements.prefix(30).compactMap { m in
             guard let w = m.weightKg else { return nil }
-            return (m.measuredAt, imperialWeight ? w * 2.20462 : w)
+            return (m.measuredAt, Units.toLbs(w))
         }.reversed()
     }
 
     private func logWeight() {
         guard let raw = Double(weightInput) else { return }
-        let kg = imperialWeight ? raw / 2.20462 : raw
+        let kg = Units.toKg(raw)
         isSaving = true
         saveError = nil
         Task {

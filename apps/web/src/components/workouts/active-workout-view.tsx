@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import { useActiveWorkout } from "@/lib/store/active-workout";
 import {
   useCreateWorkout,
+  useDeleteExerciseSets,
+  useDeleteSet,
   useDeleteWorkout,
   useFinishWorkout,
   useLogSet,
+  useUpdateSet,
 } from "@/lib/hooks/use-workouts";
 import { useWeightUnit, toKg, fromKg } from "@/lib/hooks/use-weight-unit";
 import { useProfile } from "@/lib/hooks/use-profile";
@@ -15,12 +18,12 @@ import { useMeasurements } from "@/lib/hooks/use-measurements";
 import { ExercisePicker } from "./exercise-picker";
 import { estimateOneRepMax } from "@fittrack/shared";
 import { createClient } from "@/lib/supabase/client";
-import { X, Plus, Check, Clock, Trophy, ArrowRight } from "lucide-react";
+import { X, Plus, Check, Trophy, ArrowRight, Pencil, Trash2 } from "lucide-react";
 
-function formatTime(s: number) {
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+function defaultSessionName() {
+  const hour = new Date().getHours();
+  const part = hour < 12 ? "Morning" : hour < 17 ? "Afternoon" : "Evening";
+  return `${part} Workout`;
 }
 
 export function ActiveWorkoutView() {
@@ -30,6 +33,9 @@ export function ActiveWorkoutView() {
   const deleteWorkout = useDeleteWorkout();
   const finishWorkout = useFinishWorkout();
   const logSet = useLogSet();
+  const updateSetMut = useUpdateSet();
+  const deleteSetMut = useDeleteSet();
+  const deleteExerciseSets = useDeleteExerciseSets();
   const { unit, label } = useWeightUnit();
   const { data: profile } = useProfile();
   const { data: measurements } = useMeasurements();
@@ -39,25 +45,18 @@ export function ActiveWorkoutView() {
   const bodyweightDisplay = currentBodyweightKg != null ? fromKg(currentBodyweightKg, unit) : null;
 
   const [showPicker, setShowPicker] = useState(false);
-  const [workoutName, setWorkoutName] = useState("Morning Workout");
+  const [workoutName, setWorkoutName] = useState(defaultSessionName);
   const [prFlash, setPrFlash] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [voiding, setVoiding] = useState(false);
   // Persisted store rehydrates from localStorage after mount — render nothing until
   // then so server and client markup agree.
   const [hydrated, setHydrated] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => setHydrated(true), []);
 
   // Start or use existing workout
   const hasStarted = store.workoutId !== null;
-
-  // Timers derive from timestamps instead of counting ticks, so they stay correct
-  // through page refreshes and background-tab throttling.
-  const elapsedSeconds = store.startedAt
-    ? Math.max(0, Math.floor((now - new Date(store.startedAt).getTime()) / 1000))
-    : 0;
 
   async function handleStart() {
     setActionError(null);
@@ -68,12 +67,6 @@ export function ActiveWorkoutView() {
       setActionError("Could not open the session — check your connection and try again.");
     }
   }
-
-  useEffect(() => {
-    if (!hasStarted) return;
-    const tick = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(tick);
-  }, [hasStarted]);
 
   async function handleLogSet(exerciseIndex: number, setIndex: number) {
     if (!store.workoutId) return;
@@ -102,7 +95,7 @@ export function ActiveWorkoutView() {
 
       const isPR = !currentPR || e1rm > (currentPR.estimated_one_rep_max ?? 0);
 
-      await logSet.mutateAsync({
+      const data = await logSet.mutateAsync({
         workout_id: store.workoutId,
         exercise_id: ex.exerciseId,
         set_number: setIndex + 1,
@@ -116,9 +109,70 @@ export function ActiveWorkoutView() {
         setTimeout(() => setPrFlash(false), 2500);
       }
 
-      store.markSetLogged(exerciseIndex, setIndex, isPR);
+      store.markSetLogged(exerciseIndex, setIndex, isPR, data.id);
     } catch {
       setActionError("Could not save the set — check your connection and try again.");
+    }
+  }
+
+  async function handleSaveSetEdit(exerciseIndex: number, setIndex: number, weight: string, reps: string) {
+    const s = store.exercises[exerciseIndex].sets[setIndex];
+    const weightInUnit = parseFloat(weight);
+    const parsedReps = parseInt(reps);
+    if (!s.dbId || !weightInUnit || !parsedReps) return;
+
+    setActionError(null);
+    try {
+      await updateSetMut.mutateAsync({
+        setId: s.dbId,
+        weight_kg: toKg(weightInUnit, unit),
+        reps: parsedReps,
+      });
+      store.updateSet(exerciseIndex, setIndex, { weight, reps });
+    } catch {
+      setActionError("Could not revise the set — check your connection and try again.");
+      throw new Error("save failed"); // keep the row in edit mode
+    }
+  }
+
+  async function handleRemoveSet(exerciseIndex: number, setIndex: number) {
+    const ex = store.exercises[exerciseIndex];
+    const s = ex.sets[setIndex];
+    setActionError(null);
+    try {
+      if (s.dbId) {
+        await deleteSetMut.mutateAsync(s.dbId);
+        // Keep set_number gapless: every logged set after the removed one
+        // shifts up a position.
+        for (let i = setIndex + 1; i < ex.sets.length; i++) {
+          const later = ex.sets[i];
+          if (!later.logged || !later.dbId) continue;
+          await updateSetMut.mutateAsync({
+            setId: later.dbId,
+            weight_kg: toKg(parseFloat(later.weight), unit),
+            reps: parseInt(later.reps),
+            set_number: i, // old index i → new position i-1 → set_number i
+          });
+        }
+      }
+      store.removeSet(exerciseIndex, setIndex);
+    } catch {
+      setActionError("Could not strike the set — check your connection and try again.");
+    }
+  }
+
+  async function handleRemoveExercise(index: number) {
+    const ex = store.exercises[index];
+    if (!ex) return;
+    if (!confirm(`Remove ${ex.exerciseName} and its logged sets from this session?`)) return;
+    setActionError(null);
+    try {
+      if (store.workoutId && ex.sets.some((s) => s.dbId)) {
+        await deleteExerciseSets.mutateAsync({ workoutId: store.workoutId, exerciseId: ex.exerciseId });
+      }
+      store.removeExercise(index);
+    } catch {
+      setActionError("Could not remove the exercise — check your connection and try again.");
     }
   }
 
@@ -215,16 +269,13 @@ export function ActiveWorkoutView() {
           <X className="w-5 h-5" />
         </button>
 
-        <div
-          className="flex items-center gap-2 px-3.5 py-1.5"
-          style={{ border: "1px solid var(--color-line)", borderRadius: 2 }}
-        >
-          <Clock className="w-3.5 h-3.5" style={{ color: "var(--color-text-ghost)" }} />
+        <div className="flex flex-col items-center min-w-0 px-3">
+          <span className="fig-label" style={{ fontSize: 9 }}>Active session</span>
           <span
-            className="font-display"
-            style={{ color: "var(--color-text-primary)", fontSize: 14, letterSpacing: "0.08em" }}
+            className="font-display truncate max-w-[40vw]"
+            style={{ color: "var(--color-text-primary)", fontSize: 14, letterSpacing: "0.06em" }}
           >
-            {formatTime(elapsedSeconds)}
+            {store.workoutName}
           </span>
         </div>
 
@@ -321,9 +372,20 @@ export function ActiveWorkoutView() {
             <div className="flex-1 overflow-y-auto px-6 py-4">
               <div className="mb-4">
                 <p className="fig-label mb-0.5">{currentEx.muscleGroup}</p>
-                <h2 className="text-xl font-semibold" style={{ color: "var(--color-text-primary)" }}>
-                  {currentEx.exerciseName}
-                </h2>
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-xl font-semibold" style={{ color: "var(--color-text-primary)" }}>
+                    {currentEx.exerciseName}
+                  </h2>
+                  <button
+                    onClick={() => handleRemoveExercise(store.currentExerciseIndex)}
+                    disabled={deleteExerciseSets.isPending}
+                    className="p-2 transition-colors hover:text-[var(--color-redline)] disabled:opacity-50"
+                    style={{ color: "var(--color-text-ghost)", borderRadius: 2 }}
+                    title="Remove exercise from session"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
                 {currentEx.equipment === "bodyweight" && (
                   <p className="text-xs mt-1" style={{ color: "var(--color-text-ghost)" }}>
                     Bodyweight exercise — load defaults to your logged body weight
@@ -350,7 +412,11 @@ export function ActiveWorkoutView() {
                     set={s}
                     onUpdate={(updates) => store.updateSet(store.currentExerciseIndex, si, updates)}
                     onLog={() => handleLogSet(store.currentExerciseIndex, si)}
+                    onSaveEdit={(weight, reps) => handleSaveSetEdit(store.currentExerciseIndex, si, weight, reps)}
+                    onRemove={() => handleRemoveSet(store.currentExerciseIndex, si)}
                     isLogging={logSet.isPending}
+                    isSaving={updateSetMut.isPending}
+                    isRemoving={deleteSetMut.isPending}
                   />
                 ))}
               </div>
@@ -388,14 +454,44 @@ export function ActiveWorkoutView() {
 }
 
 function SetRow({
-  setIndex, set, onUpdate, onLog, isLogging,
+  setIndex, set, onUpdate, onLog, onSaveEdit, onRemove, isLogging, isSaving, isRemoving,
 }: {
   setIndex: number;
-  set: { weight: string; reps: string; logged: boolean; isPR: boolean };
+  set: { dbId: string | null; weight: string; reps: string; logged: boolean; isPR: boolean };
   onUpdate: (updates: { weight?: string; reps?: string }) => void;
   onLog: () => void;
+  onSaveEdit: (weight: string, reps: string) => Promise<void>;
+  onRemove: () => void;
   isLogging: boolean;
+  isSaving: boolean;
+  isRemoving: boolean;
 }) {
+  // Draft state while revising an already-logged set — the store keeps the
+  // saved values until the DB update succeeds.
+  const [editing, setEditing] = useState(false);
+  const [draftWeight, setDraftWeight] = useState("");
+  const [draftReps, setDraftReps] = useState("");
+
+  function startEdit() {
+    setDraftWeight(set.weight);
+    setDraftReps(set.reps);
+    setEditing(true);
+  }
+
+  async function confirmEdit() {
+    try {
+      await onSaveEdit(draftWeight, draftReps);
+      setEditing(false);
+    } catch {
+      // save failed — stay in edit mode; the parent surfaced the error
+    }
+  }
+
+  const weightValue = editing ? draftWeight : set.weight;
+  const repsValue = editing ? draftReps : set.reps;
+  const inputsDisabled = set.logged && !editing;
+  // Logged sets can only be revised/struck once we know their DB row id.
+  const canRevise = set.logged && set.dbId !== null;
   const cellInput = {
     backgroundColor: "var(--color-sheet-inset)",
     border: "1px solid var(--color-line)",
@@ -409,10 +505,16 @@ function SetRow({
     textAlign: "center" as const,
   };
 
+  const smallAction = {
+    backgroundColor: "var(--color-sheet-inset)",
+    border: "1px solid var(--color-line)",
+    borderRadius: 2,
+  };
+
   return (
     <div
       className="grid grid-cols-12 gap-2 items-center"
-      style={{ opacity: set.logged ? 0.55 : 1 }}
+      style={{ opacity: inputsDisabled ? 0.55 : 1 }}
     >
       <span
         className="col-span-1 text-center font-display"
@@ -424,10 +526,10 @@ function SetRow({
         <input
           type="number"
           step="0.5"
-          value={set.weight}
-          onChange={(e) => onUpdate({ weight: e.target.value })}
+          value={weightValue}
+          onChange={(e) => (editing ? setDraftWeight(e.target.value) : onUpdate({ weight: e.target.value }))}
           placeholder="—"
-          disabled={set.logged}
+          disabled={inputsDisabled}
           style={cellInput}
           onFocus={(e) => (e.target.style.borderColor = "var(--color-paper)")}
           onBlur={(e) => (e.target.style.borderColor = "var(--color-line)")}
@@ -436,41 +538,86 @@ function SetRow({
       <div className="col-span-4">
         <input
           type="number"
-          value={set.reps}
-          onChange={(e) => onUpdate({ reps: e.target.value })}
+          value={repsValue}
+          onChange={(e) => (editing ? setDraftReps(e.target.value) : onUpdate({ reps: e.target.value }))}
           placeholder="—"
-          disabled={set.logged}
+          disabled={inputsDisabled}
           style={cellInput}
           onFocus={(e) => (e.target.style.borderColor = "var(--color-paper)")}
           onBlur={(e) => (e.target.style.borderColor = "var(--color-line)")}
         />
       </div>
-      <div className="col-span-3 flex justify-center">
-        <button
-          onClick={onLog}
-          disabled={set.logged || isLogging || !set.weight || !set.reps}
-          className="w-9 h-9 flex items-center justify-center transition-all duration-150 disabled:opacity-40"
-          style={{
-            backgroundColor: "var(--color-sheet-inset)",
-            borderRadius: 2,
-            border: `1px solid ${
-              set.logged
-                ? set.isPR
-                  ? "var(--color-redline)"
-                  : "var(--color-green)"
-                : "var(--color-line)"
-            }`,
-          }}
-        >
-          {set.isPR ? (
-            <Trophy className="w-4 h-4" style={{ color: "var(--color-redline)" }} />
-          ) : (
-            <Check
-              className="w-4 h-4"
-              style={{ color: set.logged ? "var(--color-green)" : "var(--color-text-ghost)" }}
-            />
-          )}
-        </button>
+      <div className="col-span-3 flex justify-center items-center gap-1.5">
+        {editing ? (
+          <>
+            <button
+              onClick={confirmEdit}
+              disabled={isSaving || !draftWeight || !draftReps}
+              className="w-9 h-9 flex items-center justify-center transition-all duration-150 disabled:opacity-40"
+              style={{ ...smallAction, borderColor: "var(--color-green)" }}
+              title="Save revision"
+            >
+              <Check className="w-4 h-4" style={{ color: "var(--color-green)" }} />
+            </button>
+            <button
+              onClick={() => setEditing(false)}
+              disabled={isSaving}
+              className="w-9 h-9 flex items-center justify-center transition-all duration-150 disabled:opacity-40"
+              style={smallAction}
+              title="Discard revision"
+            >
+              <X className="w-4 h-4" style={{ color: "var(--color-text-ghost)" }} />
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={onLog}
+              disabled={set.logged || isLogging || !set.weight || !set.reps}
+              className="w-9 h-9 flex items-center justify-center transition-all duration-150 disabled:opacity-40"
+              style={{
+                ...smallAction,
+                borderColor: set.logged
+                  ? set.isPR
+                    ? "var(--color-redline)"
+                    : "var(--color-green)"
+                  : "var(--color-line)",
+              }}
+              title={set.logged ? "Set logged" : "Log set"}
+            >
+              {set.isPR ? (
+                <Trophy className="w-4 h-4" style={{ color: "var(--color-redline)" }} />
+              ) : (
+                <Check
+                  className="w-4 h-4"
+                  style={{ color: set.logged ? "var(--color-green)" : "var(--color-text-ghost)" }}
+                />
+              )}
+            </button>
+            {canRevise && (
+              <button
+                onClick={startEdit}
+                disabled={isSaving || isRemoving}
+                className="w-7 h-7 flex items-center justify-center transition-colors disabled:opacity-40 hover:text-[var(--color-paper)]"
+                style={{ ...smallAction, color: "var(--color-text-ghost)" }}
+                title="Revise set"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {(canRevise || !set.logged) && (
+              <button
+                onClick={onRemove}
+                disabled={isSaving || isRemoving}
+                className="w-7 h-7 flex items-center justify-center transition-colors disabled:opacity-40 hover:text-[var(--color-redline)]"
+                style={{ ...smallAction, color: "var(--color-text-ghost)" }}
+                title="Strike set"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

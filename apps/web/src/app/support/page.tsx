@@ -4,8 +4,8 @@ export const metadata: Metadata = { title: "Support" };
 
 const faqs = [
   {
-    q: "How do I switch between kg and lbs?",
-    a: "Open Settings → Spec B (Biometrics) and tap the KG / LBS chip next to the weight field. The whole app — dashboard, workouts, and progress charts — follows that setting.",
+    q: "What units does the app use?",
+    a: "Pounds (lbs) everywhere — dashboard, workouts, body log, and progress charts. There is no unit setting to manage.",
   },
   {
     q: "How are personal records calculated?",

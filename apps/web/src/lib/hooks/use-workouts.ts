@@ -269,6 +269,29 @@ export function useUpdateSet() {
   });
 }
 
+export function useDeleteExerciseSets() {
+  const supabase = createClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ workoutId, exerciseId }: { workoutId: string; exerciseId: string }) => {
+      const { error } = await supabase
+        .from("workout_sets")
+        .delete()
+        .eq("workout_id", workoutId)
+        .eq("exercise_id", exerciseId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      // The DB trigger recalculates PRs; removing an exercise's sets also
+      // changes which exercises are logged
+      queryClient.invalidateQueries({ queryKey: ["workouts"] });
+      queryClient.invalidateQueries({ queryKey: ["prs"] });
+      queryClient.invalidateQueries({ queryKey: ["logged-exercises"] });
+    },
+  });
+}
+
 export function useDeleteSet() {
   const supabase = createClient();
   const queryClient = useQueryClient();

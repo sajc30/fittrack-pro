@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(AuthViewModel.self)    private var auth
     @Environment(ProfileViewModel.self) private var profile
+    @Environment(WorkoutViewModel.self) private var workout
 
     var body: some View {
         Group {
@@ -33,6 +34,9 @@ struct ContentView: View {
                         guard let uid = auth.session?.user.id else { return }
                         await profile.load(userId: uid)
                         await profile.loadMeasurements(userId: uid)
+                        // Resurface an unfinished session from a previous launch;
+                        // the tab-bar banner offers the way back in.
+                        await workout.restoreActiveSession(userId: uid)
                     }
             }
         }
@@ -44,9 +48,9 @@ struct ContentView: View {
 // ── Main Tab Navigation ──────────────────────────────────────────────
 struct MainTabView: View {
     @Environment(WorkoutViewModel.self) private var workout
-    @State private var isWorkoutSheetPresented = false
 
     var body: some View {
+        @Bindable var workout = workout
         TabView {
             DashboardView()
                 .tabItem { Label("Dashboard", systemImage: "square.grid.2x2") }
@@ -65,12 +69,63 @@ struct MainTabView: View {
         }
         .tint(Color.bpPaper)
         .background(Color.bpInk)
-        .sheet(isPresented: $isWorkoutSheetPresented) {
+        // Session-in-progress strip, floating above the tab bar on every tab.
+        // Minimizing the sheet never ends the session — this brings it back.
+        .overlay(alignment: .bottom) {
+            if workout.isWorkoutActive && !workout.showActiveSession {
+                ActiveSessionBanner { workout.showActiveSession = true }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 58)
+            }
+        }
+        .sheet(isPresented: $workout.showActiveSession) {
             ActiveWorkoutView()
-                .interactiveDismissDisabled()
         }
-        .onChange(of: workout.isWorkoutActive) { _, active in
-            isWorkoutSheetPresented = active
+    }
+}
+
+// ── Active session banner ────────────────────────────────────────────
+struct ActiveSessionBanner: View {
+    @Environment(WorkoutViewModel.self) private var workout
+    let onTap: () -> Void
+
+    @State private var pulsing = false
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(Color.bpRedline)
+                    .frame(width: 8, height: 8)
+                    .opacity(pulsing ? 0.35 : 1)
+                    .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulsing)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("SESSION IN PROGRESS")
+                        .font(.blueprint(9, weight: .semibold))
+                        .tracking(1.5)
+                        .foregroundStyle(Color.bpRedline)
+                    Text("\(workout.activeWorkout?.name ?? "Session") · \(workout.activeSets.count) set\(workout.activeSets.count == 1 ? "" : "s")")
+                        .font(.blueprint(12, weight: .semibold))
+                        .foregroundStyle(Color.bpTextPrimary)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Text("RESUME")
+                    .font(.blueprint(10, weight: .semibold))
+                    .tracking(1.5)
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                    .background(Color.bpRedline)
+                    .foregroundStyle(Color.bpInk)
+                    .clipShape(RoundedRectangle(cornerRadius: 2))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Color.bpSheet)
+            .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpRedline.opacity(0.6), lineWidth: 1))
+            .shadow(color: .black.opacity(0.4), radius: 10, y: 4)
         }
+        .buttonStyle(.plain)
+        .onAppear { pulsing = true }
     }
 }

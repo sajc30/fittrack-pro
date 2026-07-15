@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Search, X } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { useExercises } from "@/lib/hooks/use-exercises";
+import { CreateExerciseForm } from "@/components/exercises/create-exercise-form";
 import { MUSCLE_GROUP_LABELS, MUSCLE_GROUP_ORDER } from "@fittrack/shared";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -33,6 +34,7 @@ export function ExercisePicker({ onSelect, onClose }: Props) {
   const [muscle,    setMuscle]    = useState<MuscleGroup | "all">("all");
   const [equipment, setEquipment] = useState<Equipment | "all">("all");
   const [tab,       setTab]       = useState<FilterTab>("equipment");
+  const [creating,  setCreating]  = useState(false);
 
   const { data: exercises, isLoading } = useExercises(muscle, search, equipment);
 
@@ -55,6 +57,26 @@ export function ExercisePicker({ onSelect, onClose }: Props) {
     border: `1px solid ${active ? "var(--color-paper)" : "var(--color-line)"}`,
   });
 
+  if (creating) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: "var(--color-ink)" }}>
+        <div
+          className="flex items-center gap-3 px-5 py-4 border-b shrink-0"
+          style={{ borderColor: "var(--color-line)", backgroundColor: "var(--color-sheet)" }}
+        >
+          <button onClick={() => setCreating(false)} className="p-1.5" style={{ color: "var(--color-text-secondary)", borderRadius: 2 }}>
+            <X className="w-5 h-5" />
+          </button>
+          <h2 className="fig-label flex-1">Index — new custom exercise</h2>
+        </div>
+        <CreateExerciseForm
+          onCreated={(ex) => onSelect(ex)}
+          onCancel={() => setCreating(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: "var(--color-ink)" }}>
       {/* Header */}
@@ -66,6 +88,12 @@ export function ExercisePicker({ onSelect, onClose }: Props) {
           <X className="w-5 h-5" />
         </button>
         <h2 className="fig-label flex-1">Index — choose exercise</h2>
+        <button
+          onClick={() => setCreating(true)}
+          className="bp-btn-outline px-2.5 py-1 flex items-center gap-1"
+        >
+          <Plus className="w-3 h-3" /> New
+        </button>
         {activeFilterCount > 0 && (
           <button onClick={clearAll} className="bp-btn-outline px-2.5 py-1">
             Clear {activeFilterCount} filter{activeFilterCount > 1 ? "s" : ""}
@@ -195,9 +223,17 @@ export function ExercisePicker({ onSelect, onClose }: Props) {
             <p style={{ color: "var(--color-text-ghost)", fontSize: 14 }}>
               Nothing in the index matches your filters.
             </p>
-            <button onClick={clearAll} className="bp-btn-outline px-3 py-1.5">
-              Clear all filters
-            </button>
+            <div className="flex items-center justify-center gap-2">
+              <button onClick={clearAll} className="bp-btn-outline px-3 py-1.5">
+                Clear all filters
+              </button>
+              <button
+                onClick={() => setCreating(true)}
+                className="bp-btn-outline px-3 py-1.5 flex items-center gap-1"
+              >
+                <Plus className="w-3 h-3" /> New custom exercise
+              </button>
+            </div>
           </div>
         ) : (
           <div className="space-y-1.5">

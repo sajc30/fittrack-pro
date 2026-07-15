@@ -10,16 +10,17 @@ struct ActiveWorkoutView: View {
     @State private var repsInput   = ""
     @State private var showExercisePicker = false
     @State private var showVoidConfirm = false
-    @State private var elapsedSeconds = 0
-    @State private var elapsedTask: Task<Void, Never>?
-    @State private var weightUnit: String = "kg"
+    @State private var editingSet: WorkoutSet?
+    @State private var exerciseToRemove: Exercise?
+    @State private var showRemoveExerciseConfirm = false
+    @Environment(\.dismiss) private var dismiss
 
-    private var weightUnitLabel: String { weightUnit == "lbs" ? "LBS" : "KG" }
+    private let weightUnitLabel = "LBS"
 
     // Latest logged body weight wins over the profile field, mirroring the Body page.
     private var currentBodyweightDisplay: Double? {
         guard let kg = profile.measurements.first?.weightKg ?? profile.profile?.weightKg else { return nil }
-        return weightUnit == "lbs" ? kg * 2.20462 : kg
+        return Units.toLbs(kg)
     }
 
     // Group sets by exercise for display
@@ -41,12 +42,22 @@ struct ActiveWorkoutView: View {
             VStack(spacing: 0) {
                 // Header
                 HStack {
+                    // Minimize — the session keeps running; the tab-bar banner brings it back.
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.bpTextSecondary)
+                            .frame(width: 30, height: 30)
+                            .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLine, lineWidth: 1))
+                    }
                     VStack(alignment: .leading, spacing: 3) {
                         Text("ACTIVE SESSION").figLabel(size: 10)
-                        Text(elapsedFormatted)
-                            .font(.blueprint(20, weight: .semibold))
+                        Text(workout.activeWorkout?.name ?? "Session")
+                            .font(.blueprint(16, weight: .semibold))
                             .foregroundStyle(Color.bpTextPrimary)
+                            .lineLimit(1)
                     }
+                    .padding(.leading, 4)
                     Spacer()
                     // Void button
                     Button { showVoidConfirm = true } label: {
@@ -91,13 +102,26 @@ struct ActiveWorkoutView: View {
                         ForEach(setsByExercise, id: \.sets.first?.exerciseId) { group in
                             SheetCard {
                                 VStack(alignment: .leading, spacing: 8) {
-                                    Text(group.exercise?.name ?? "Unknown")
-                                        .font(.blueprint(12, weight: .semibold))
-                                        .foregroundStyle(Color.bpTextPrimary)
-                                        .padding(.bottom, 4)
+                                    HStack {
+                                        Text(group.exercise?.name ?? "Unknown")
+                                            .font(.blueprint(12, weight: .semibold))
+                                            .foregroundStyle(Color.bpTextPrimary)
+                                        Spacer()
+                                        if let ex = group.exercise {
+                                            Button {
+                                                exerciseToRemove = ex
+                                                showRemoveExerciseConfirm = true
+                                            } label: {
+                                                Image(systemName: "trash")
+                                                    .font(.system(size: 11))
+                                                    .foregroundStyle(Color.bpRedline.opacity(0.8))
+                                            }
+                                        }
+                                    }
+                                    .padding(.bottom, 4)
                                     Divider().background(Color.bpLine)
                                     ForEach(group.sets) { set in
-                                        HStack {
+                                        HStack(spacing: 10) {
                                             Text("SET \(set.setNumber)")
                                                 .font(.blueprint(10))
                                                 .foregroundStyle(Color.bpTextGhost)
@@ -107,6 +131,22 @@ struct ActiveWorkoutView: View {
                                                 .foregroundStyle(Color.bpTextPrimary)
                                             Spacer()
                                             if set.isPr { Stamp(text: "PR").scaleEffect(0.8) }
+                                            Button { editingSet = set } label: {
+                                                Image(systemName: "pencil")
+                                                    .font(.system(size: 12))
+                                                    .foregroundStyle(Color.bpTextGhost)
+                                                    .frame(width: 26, height: 26)
+                                                    .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLine, lineWidth: 1))
+                                            }
+                                            Button {
+                                                Task { await workout.deleteActiveSet(set.id) }
+                                            } label: {
+                                                Image(systemName: "trash")
+                                                    .font(.system(size: 12))
+                                                    .foregroundStyle(Color.bpRedline.opacity(0.8))
+                                                    .frame(width: 26, height: 26)
+                                                    .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpRedline.opacity(0.4), lineWidth: 1))
+                                            }
                                         }
                                     }
                                 }
@@ -171,6 +211,19 @@ struct ActiveWorkoutView: View {
         .sheet(isPresented: $showExercisePicker) {
             ExercisePickerSheet(selected: $selectedExercise)
         }
+        .sheet(item: $editingSet) { set in
+            EditSetSheet(set: set)
+        }
+        .confirmationDialog("REMOVE \(exerciseToRemove?.name.uppercased() ?? "EXERCISE")?",
+                            isPresented: $showRemoveExerciseConfirm, titleVisibility: .visible) {
+            Button("Remove & Delete Sets", role: .destructive) {
+                guard let ex = exerciseToRemove else { return }
+                Task { await workout.removeActiveExercise(ex.id) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("All sets logged for this exercise in this session will be deleted.")
+        }
         .dismissesKeyboardOnTap()
         .confirmationDialog("VOID SESSION?", isPresented: $showVoidConfirm, titleVisibility: .visible) {
             Button("Void & Delete", role: .destructive) { voidWorkout() }
@@ -178,16 +231,11 @@ struct ActiveWorkoutView: View {
         } message: {
             Text("This session will be permanently deleted and no sets will be saved.")
         }
-        .onAppear {
-            startElapsedTimer()
-            weightUnit = UserDefaults.standard.string(forKey: "settings_weightUnit") ?? "kg"
-        }
         .onChange(of: selectedExercise) { _, newValue in
             guard newValue?.equipment == "bodyweight", weightInput.isEmpty,
                   let bw = currentBodyweightDisplay else { return }
             weightInput = fmt(bw)
         }
-        .onDisappear { elapsedTask?.cancel() }
     }
 
     private var bodyweightHint: String {
@@ -201,28 +249,9 @@ struct ActiveWorkoutView: View {
         v.truncatingRemainder(dividingBy: 1) == 0 ? String(format: "%.0f", v) : String(format: "%.1f", v)
     }
 
-    private var elapsedFormatted: String {
-        let h = elapsedSeconds / 3600
-        let m = (elapsedSeconds % 3600) / 60
-        let s = elapsedSeconds % 60
-        if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
-        return String(format: "%02d:%02d", m, s)
-    }
-
-    private func startElapsedTimer() {
-        elapsedTask?.cancel()
-        elapsedTask = Task { @MainActor in
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-                guard !Task.isCancelled else { break }
-                elapsedSeconds += 1
-            }
-        }
-    }
-
     private func setWeightLabel(_ set: WorkoutSet) -> String {
         guard let kg = set.weightKg else { return "— × \(set.reps ?? 0) reps" }
-        let display = weightUnit == "lbs" ? kg * 2.20462 : kg
+        let display = Units.toLbs(kg)
         let formatted = display.truncatingRemainder(dividingBy: 1) == 0
             ? String(format: "%.0f", display)
             : String(format: "%.1f", display)
@@ -233,7 +262,7 @@ struct ActiveWorkoutView: View {
         guard let ex = selectedExercise,
               let inputVal = Double(weightInput),
               let reps = Int(repsInput) else { return }
-        let weightKg = weightUnit == "lbs" ? inputVal / 2.20462 : inputVal
+        let weightKg = Units.toKg(inputVal)
         Task {
             await workout.logSet(exerciseId: ex.id, weight: weightKg, reps: reps)
             repsInput = ""
@@ -241,13 +270,77 @@ struct ActiveWorkoutView: View {
     }
 
     private func finishWorkout() {
-        elapsedTask?.cancel()
         Task { await workout.finishWorkout() }
     }
 
     private func voidWorkout() {
-        elapsedTask?.cancel()
         Task { await workout.voidWorkout() }
+    }
+}
+
+// ── Edit Set Sheet (live revision) ───────────────────────────────────
+struct EditSetSheet: View {
+    let set: WorkoutSet
+
+    @Environment(WorkoutViewModel.self) private var workout
+    @Environment(\.dismiss) private var dismiss
+    @State private var weightInput = ""
+    @State private var repsInput = ""
+
+    private let weightUnitLabel = "LBS"
+
+    var body: some View {
+        ZStack {
+            Color.bpInk.ignoresSafeArea()
+            VStack(spacing: 16) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.bpLine)
+                    .frame(width: 36, height: 4)
+                    .padding(.top, 12)
+                Text("REVISE — \(set.exercise?.name.uppercased() ?? "SET") · SET \(set.setNumber)")
+                    .figLabel(size: 10)
+
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("WEIGHT (\(weightUnitLabel))").figLabel(size: 8)
+                        BPTextField(placeholder: "e.g. 80", text: $weightInput)
+                            .keyboardType(.decimalPad)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("REPS").figLabel(size: 8)
+                        BPTextField(placeholder: "e.g. 5", text: $repsInput)
+                            .keyboardType(.numberPad)
+                    }
+                }
+                .padding(.horizontal, 20)
+
+                BPButton(title: "SAVE REVISION",
+                         action: save,
+                         isDisabled: Double(weightInput) == nil || Int(repsInput) == nil)
+                    .padding(.horizontal, 20)
+
+                Spacer()
+            }
+        }
+        .presentationDetents([.height(280)])
+        .onAppear {
+            if let kg = set.weightKg {
+                let display = Units.toLbs(kg)
+                weightInput = display.truncatingRemainder(dividingBy: 1) == 0
+                    ? String(format: "%.0f", display)
+                    : String(format: "%.1f", display)
+            }
+            repsInput = set.reps.map(String.init) ?? ""
+        }
+    }
+
+    private func save() {
+        guard let inputVal = Double(weightInput), let reps = Int(repsInput) else { return }
+        let weightKg = Units.toKg(inputVal)
+        Task {
+            await workout.updateActiveSet(set.id, weightKg: weightKg, reps: reps)
+            dismiss()
+        }
     }
 }
 
@@ -257,6 +350,7 @@ struct ExercisePickerSheet: View {
     @Environment(WorkoutViewModel.self) private var workout
     @Environment(\.dismiss) private var dismiss
     @State private var search = ""
+    @State private var showCreateSheet = false
 
     private var filtered: [Exercise] {
         if search.isEmpty { return workout.exercises }
@@ -272,7 +366,22 @@ struct ExercisePickerSheet: View {
                     RoundedRectangle(cornerRadius: 2)
                         .fill(Color.bpLine)
                         .frame(width: 36, height: 4)
-                    Text("INDEX — CHOOSE EXERCISE").figLabel(size: 10)
+                    HStack {
+                        Spacer()
+                        Text("INDEX — CHOOSE EXERCISE").figLabel(size: 10)
+                        Spacer()
+                        Button { showCreateSheet = true } label: {
+                            Text("+ NEW")
+                                .font(.blueprint(11, weight: .semibold))
+                                .tracking(1.5)
+                                .padding(.horizontal, 12)
+                                .frame(minHeight: 36)
+                                .background(Color.bpPaper)
+                                .foregroundStyle(Color.bpInk)
+                                .clipShape(RoundedRectangle(cornerRadius: 2))
+                        }
+                    }
+                    .padding(.horizontal, 20)
                     BPTextField(placeholder: "Search index…", text: $search)
                         .padding(.horizontal, 20)
                 }
@@ -309,5 +418,11 @@ struct ExercisePickerSheet: View {
             }
         }
         .task { await workout.loadExercises() }
+        .sheet(isPresented: $showCreateSheet) {
+            CreateExerciseSheet { created in
+                selected = created
+                dismiss()
+            }
+        }
     }
 }

@@ -1,4 +1,4 @@
-import type { ActivityLevel, MuscleGroup } from "./types";
+import type { ActivityLevel, Equipment, MuscleGroup } from "./types";
 
 export const ACTIVITY_LEVEL_LABELS: Record<ActivityLevel, string> = {
   sedentary: "Sedentary (desk job, little exercise)",
@@ -38,6 +38,28 @@ export const MUSCLE_GROUP_ORDER: MuscleGroup[] = [
   "forearms",
   "full_body",
   "cardio",
+];
+
+export const EQUIPMENT_LABELS: Record<Equipment, string> = {
+  barbell: "Barbell",
+  dumbbell: "Dumbbell",
+  cable: "Cable",
+  machine: "Machine",
+  bodyweight: "Bodyweight",
+  kettlebell: "Kettlebell",
+  bands: "Bands",
+  other: "Other",
+};
+
+export const EQUIPMENT_ORDER: Equipment[] = [
+  "barbell",
+  "dumbbell",
+  "cable",
+  "machine",
+  "bodyweight",
+  "kettlebell",
+  "bands",
+  "other",
 ];
 
 export const DEFAULT_REST_TIMER_SECONDS = 90;

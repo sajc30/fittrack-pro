@@ -250,10 +250,7 @@ struct SettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
-        .onAppear {
-            prefillFromProfile()
-            UserDefaults.standard.set("lbs", forKey: "settings_weightUnit")
-        }
+        .onAppear { prefillFromProfile() }
         .onChange(of: profile.profile) { _, _ in prefillFromProfile() }
     }
 

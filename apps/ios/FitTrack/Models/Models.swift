@@ -1,5 +1,13 @@
 import Foundation
 
+// ── Units ────────────────────────────────────────────────────────────
+// The app is lbs-only in the UI; the database always stores kg.
+enum Units {
+    static let lbsPerKg = 2.20462
+    static func toLbs(_ kg: Double) -> Double { kg * lbsPerKg }
+    static func toKg(_ lbs: Double) -> Double { lbs / lbsPerKg }
+}
+
 // ── Profile ─────────────────────────────────────────────────────────
 struct Profile: Codable, Identifiable, Equatable, Sendable {
     let id: UUID

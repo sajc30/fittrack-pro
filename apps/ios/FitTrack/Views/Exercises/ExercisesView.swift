@@ -6,6 +6,7 @@ struct ExercisesView: View {
     @State private var search     = ""
     @State private var muscle     = "all"
     @State private var equipment  = "all"
+    @State private var showCreateSheet = false
 
     private let muscleGroups = ["chest","back","shoulders","biceps","triceps",
                                 "quadriceps","hamstrings","glutes","core","calves","full_body"]
@@ -37,7 +38,15 @@ struct ExercisesView: View {
                                     .foregroundStyle(Color.bpTextPrimary)
                             }
                             Spacer()
-                            Text("CATALOG & REFERENCE").figLabel(size: 9)
+                            Button { showCreateSheet = true } label: {
+                                Text("+ NEW")
+                                    .font(.blueprint(11, weight: .semibold))
+                                    .tracking(2)
+                                    .padding(.horizontal, 12).padding(.vertical, 8)
+                                    .background(Color.bpPaper)
+                                    .foregroundStyle(Color.bpInk)
+                                    .clipShape(RoundedRectangle(cornerRadius: 2))
+                            }
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 20)
@@ -133,5 +142,8 @@ struct ExercisesView: View {
             .navigationBarHidden(true)
         }
         .task { await workout.loadExercises() }
+        .sheet(isPresented: $showCreateSheet) {
+            CreateExerciseSheet()
+        }
     }
 }

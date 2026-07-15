@@ -64,7 +64,6 @@ export function BodyMetricsView() {
 
   // Imperial-only across the app (lbs + ft/in). DB stores kg/cm; convert at display/entry.
   const weightUnit = "lbs" as const;
-  const heightUnit = "imperial" as const;
 
   const latest = measurements?.[0];
 
@@ -94,16 +93,10 @@ export function BodyMetricsView() {
     ? calculateBMI(weightForCalcs, profile.height_cm)
     : null;
 
-  const wUnit = weightUnit === "lbs" ? "lbs" : "kg";
-  const displayLatestWeight = latest?.weight_kg
-    ? weightUnit === "lbs" ? kgToLbs(latest.weight_kg) : latest.weight_kg
-    : null;
-  const displayProfileWeight = profile?.weight_kg
-    ? weightUnit === "lbs" ? kgToLbs(profile.weight_kg) : profile.weight_kg
-    : null;
-  const displayHeight = profile?.height_cm
-    ? heightUnit === "imperial" ? cmToFtIn(profile.height_cm) : `${profile.height_cm} cm`
-    : "—";
+  const wUnit = weightUnit;
+  const displayLatestWeight = latest?.weight_kg ? kgToLbs(latest.weight_kg) : null;
+  const displayProfileWeight = profile?.weight_kg ? kgToLbs(profile.weight_kg) : null;
+  const displayHeight = profile?.height_cm ? cmToFtIn(profile.height_cm) : "—";
 
   const weightHistory = useMemo(() =>
     (measurements ?? [])
@@ -112,15 +105,15 @@ export function BodyMetricsView() {
       .reverse()
       .map((m) => ({
         date: format(new Date(m.measured_at), "MMM d"),
-        weight: weightUnit === "lbs" ? kgToLbs(m.weight_kg as number) : (m.weight_kg as number),
+        weight: kgToLbs(m.weight_kg as number),
       })),
-    [measurements, weightUnit]
+    [measurements]
   );
 
   async function handleAddWeight() {
     const raw = parseFloat(weight);
     if (!raw) return;
-    const kg = weightUnit === "lbs" ? raw / 2.20462 : raw;
+    const kg = raw / 2.20462;
     setSaving(true);
     setSaveError(null);
     try {
@@ -214,7 +207,7 @@ export function BodyMetricsView() {
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAddWeight()}
-                placeholder={`e.g. ${weightUnit === "lbs" ? "185.0" : "84.0"}`}
+                placeholder="e.g. 185.0"
                 className="flex-1 px-3 py-2 text-sm"
                 style={{
                   fontFamily: "var(--font-mono)",

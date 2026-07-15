@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { Plus } from "lucide-react";
 import { useExercises } from "@/lib/hooks/use-exercises";
+import { CreateExerciseForm } from "./create-exercise-form";
 import { MUSCLE_GROUP_LABELS, MUSCLE_GROUP_ORDER } from "@fittrack/shared";
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -42,6 +44,7 @@ export function ExerciseLibrary() {
   const [search,    setSearch]    = useState("");
   const [muscle,    setMuscle]    = useState<MuscleGroup | "all">("all");
   const [equipment, setEquipment] = useState<Equipment | "all">("all");
+  const [creating,  setCreating]  = useState(false);
 
   const { data: exercises, isLoading } = useExercises(muscle, search, equipment);
 
@@ -125,6 +128,15 @@ export function ExerciseLibrary() {
         <p className="fig-label" style={{ fontSize: 11 }}>
           {isLoading ? "SCANNING…" : `${exercises?.length ?? 0} ENTRIES`}
         </p>
+        {!creating && (
+          <button
+            onClick={() => setCreating(true)}
+            className="bp-btn-outline px-2.5 py-1 flex items-center gap-1"
+            style={{ fontSize: 11 }}
+          >
+            <Plus className="w-3 h-3" /> New exercise
+          </button>
+        )}
         {hasFilters && (
           <button
             onClick={clearAll}
@@ -135,6 +147,16 @@ export function ExerciseLibrary() {
           </button>
         )}
       </div>
+
+      {/* New custom exercise */}
+      {creating && (
+        <div className="sheet flex flex-col" style={{ borderRadius: 2 }}>
+          <CreateExerciseForm
+            onCreated={() => setCreating(false)}
+            onCancel={() => setCreating(false)}
+          />
+        </div>
+      )}
 
       {/* Catalog index */}
       {isLoading ? (
@@ -192,6 +214,21 @@ export function ExerciseLibrary() {
               <div>
                 <p style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--color-text-primary)", lineHeight: 1.3 }}>
                   {ex.name}
+                  {ex.is_custom && (
+                    <span
+                      style={{
+                        marginLeft: 8,
+                        fontSize: 9,
+                        letterSpacing: "0.1em",
+                        color: "var(--color-redline)",
+                        border: "1px solid var(--color-redline)",
+                        borderRadius: 2,
+                        padding: "1px 4px",
+                      }}
+                    >
+                      CUSTOM
+                    </span>
+                  )}
                 </p>
                 <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, color: "var(--color-text-secondary)", marginTop: 2, letterSpacing: "0.06em" }}>
                   {MUSCLE_GROUP_LABELS[ex.muscle_group as MuscleGroup] ?? ex.muscle_group}
