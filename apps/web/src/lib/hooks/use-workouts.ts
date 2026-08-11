@@ -19,6 +19,7 @@ export function useWorkouts(limit = 50) {
           *,
           workout_sets (
             id, exercise_id, set_number, reps, weight_kg, set_type, is_pr, logged_at,
+            parent_set_id, superset_group,
             exercises ( id, name, muscle_group )
           )
         `)
@@ -75,10 +76,13 @@ export function useWeeklySets() {
       const lastWeekStart = new Date(weekStart);
       lastWeekStart.setDate(lastWeekStart.getDate() - 7);
 
+      // Drops are excluded: a dropset is one working set, however many drops
+      // hang off it. Volume counts every row; set counts don't.
       const { data, error } = await supabase
         .from("workout_sets")
         .select("logged_at, workouts!inner(user_id)")
         .eq("workouts.user_id", user.id)
+        .is("parent_set_id", null)
         .gte("logged_at", lastWeekStart.toISOString());
 
       if (error) throw error;
@@ -168,6 +172,9 @@ export function useLogSet() {
       set_type?: string;
       is_pr?: boolean;
       rpe?: number;
+      /** Set for a drop — points at the working set it hangs off. */
+      parent_set_id?: string | null;
+      superset_group?: number | null;
     }) => {
       const { data, error } = await supabase
         .from("workout_sets")
@@ -177,9 +184,11 @@ export function useLogSet() {
           set_number: set.set_number,
           reps: set.reps,
           weight_kg: set.weight_kg,
-          set_type: (set.set_type ?? "normal") as "normal",
+          set_type: (set.set_type ?? (set.parent_set_id ? "dropset" : "normal")) as "normal",
           is_pr: set.is_pr ?? false,
           rpe: set.rpe ?? null,
+          parent_set_id: set.parent_set_id ?? null,
+          superset_group: set.superset_group ?? null,
           logged_at: new Date().toISOString(),
         })
         .select()
@@ -193,6 +202,37 @@ export function useLogSet() {
       queryClient.invalidateQueries({ queryKey: ["workouts"] });
       queryClient.invalidateQueries({ queryKey: ["prs"] });
     },
+  });
+}
+
+/**
+ * Stamp (or clear) the superset group on every set already logged for an
+ * exercise. Pairing usually happens after the first round is on the board, so
+ * without this the earlier rows would read as ungrouped and history would show
+ * the pairing on one side only.
+ */
+export function useSetSupersetGroup() {
+  const supabase = createClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      workoutId,
+      exerciseId,
+      group,
+    }: {
+      workoutId: string;
+      exerciseId: string;
+      group: number | null;
+    }) => {
+      const { error } = await supabase
+        .from("workout_sets")
+        .update({ superset_group: group })
+        .eq("workout_id", workoutId)
+        .eq("exercise_id", exerciseId);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["workouts"] }),
   });
 }
 

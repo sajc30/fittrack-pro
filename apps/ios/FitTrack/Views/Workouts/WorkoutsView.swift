@@ -128,7 +128,7 @@ struct SessionCard: View {
                 HStack(spacing: 0) {
                     StatCell(label: "EXERCISES", value: "\(exerciseCount)")
                     Divider().frame(height: 32).background(Color.bpLine)
-                    StatCell(label: "SETS", value: "\(sets.count)")
+                    StatCell(label: "SETS", value: "\(sets.filter { $0.parentSetId == nil }.count)")
                     Divider().frame(height: 32).background(Color.bpLine)
                     StatCell(label: "REPS", value: "\(totalReps)")
                 }

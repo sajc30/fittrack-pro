@@ -77,7 +77,11 @@ struct WorkoutDetailView: View {
         return ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 header(workout: workout, prCount: sets.filter(\.isPr).count)
-                statsRow(groupCount: groups.count, setCount: sets.count,
+                sessionNote(workout)
+                // Reps count every row; sets count only working sets — a dropset
+                // is one set with extra volume, not several sets.
+                statsRow(groupCount: groups.count,
+                         setCount: sets.filter { $0.parentSetId == nil }.count,
                          totalReps: sets.reduce(0) { $0 + ($1.reps ?? 0) })
 
                 if isEditing {
@@ -147,6 +151,25 @@ struct WorkoutDetailView: View {
         .padding(.horizontal, 20)
     }
 
+    /// The whole point of writing a session note is reading it back later.
+    @ViewBuilder
+    private func sessionNote(_ workout: Workout) -> some View {
+        if let note = workout.notes, !note.isEmpty {
+            HStack(alignment: .top, spacing: 8) {
+                Rectangle().fill(Color.bpLine).frame(width: 2)
+                Text(note)
+                    .font(.blueprint(12))
+                    .foregroundStyle(Color.bpTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 10)
+            .background(Color.bpSheetInset)
+            .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLine, lineWidth: 1))
+            .padding(.horizontal, 20)
+        }
+    }
+
     private func statsRow(groupCount: Int, setCount: Int, totalReps: Int) -> some View {
         SheetCard {
             HStack(spacing: 0) {
@@ -201,7 +224,9 @@ struct WorkoutDetailView: View {
                 id: g.id,
                 name: g.name,
                 muscleGroup: g.muscleGroup,
-                sets: g.sets.map { s in
+                // Drops stay out of revision: they'd be renumbered as working
+                // sets here, and the live session is where a chain is built.
+                sets: g.sets.filter { $0.parentSetId == nil }.map { s in
                     DraftSet(
                         setId: s.id,
                         weight: s.weightKg.map { fmt(displayWeight($0)) } ?? "",
@@ -248,7 +273,14 @@ struct WorkoutDetailView: View {
             map[s.exerciseId, default: []].append(s)
         }
         return order.map { exId in
-            let exSets = (map[exId] ?? []).sorted { $0.setNumber < $1.setNumber }
+            // Working sets in order, each followed by its drops — drops share
+            // their parent's set number, so sorting on it alone isn't enough.
+            let all = map[exId] ?? []
+            let drops = all.filter { $0.parentSetId != nil }
+            let exSets = all
+                .filter { $0.parentSetId == nil }
+                .sorted { $0.setNumber < $1.setNumber }
+                .flatMap { parent in [parent] + drops.filter { $0.parentSetId == parent.id } }
             let ex = exSets.first?.exercise
             return ExerciseGroup(id: exId, name: ex?.name ?? "Exercise",
                                  muscleGroup: ex?.muscleGroup ?? "", sets: exSets)
@@ -301,13 +333,21 @@ fileprivate struct ExerciseDetailCard: View {
                         .foregroundStyle(Color.bpTextPrimary)
                     Text(muscleGroupLabel)
                         .figLabel(size: 9)
+                    if let g = group.sets.compactMap(\.supersetGroup).first {
+                        Text("SUPERSET \(String(UnicodeScalar(64 + UInt8(g)) ?? "A"))")
+                            .figLabel(size: 9)
+                    }
                 }
                 Divider().background(Color.bpLine)
 
                 VStack(spacing: 0) {
                     ForEach(Array(group.sets.enumerated()), id: \.element.id) { i, s in
                         HStack(spacing: 12) {
-                            Text("\(i + 1)")
+                            // Drops carry their parent's number rather than one
+                            // of their own, so they get a chain glyph instead.
+                            Text(s.parentSetId != nil
+                                 ? "↳"
+                                 : "\(group.sets.prefix(i + 1).filter { $0.parentSetId == nil }.count)")
                                 .font(.blueprint(12))
                                 .foregroundStyle(Color.bpTextGhost)
                                 .frame(width: 18, alignment: .center)

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { useWeightUnit, formatKg } from "@/lib/hooks/use-weight-unit";
+import { useWeightUnit, formatKg, fromKg } from "@/lib/hooks/use-weight-unit";
 import {
   LineChart,
   Line,
@@ -19,6 +19,8 @@ import { useWorkouts } from "@/lib/hooks/use-workouts";
 import { estimateOneRepMax, MUSCLE_GROUP_LABELS } from "@fittrack/shared";
 import { format, subWeeks, startOfWeek, endOfWeek, isSameWeek } from "date-fns";
 import { ChevronDown, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { ReadyToProgress } from "./ready-to-progress";
+import { useWeeklyVolume } from "@/lib/hooks/use-progression";
 
 const AXIS_TICK = {
   fontSize: 11,
@@ -69,6 +71,36 @@ function StrengthTooltip({ active, payload }: { active?: boolean; payload?: Arra
       </p>
       <p style={{ color: "var(--color-text-secondary)", fontSize: 11, marginTop: 2 }}>
         {formatKg(p.weight, unit)} {label} × {p.reps} — {p.date.toUpperCase()}
+      </p>
+    </div>
+  );
+}
+
+function VolumeTooltip({
+  active, payload, unitLabel,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: { week: string; volume: number } }>;
+  unitLabel: string;
+}) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0].payload;
+  return (
+    <div
+      style={{
+        backgroundColor: "var(--color-sheet-raised)",
+        border: "1px solid var(--color-line-bright)",
+        borderRadius: 2,
+        padding: "8px 12px",
+        fontFamily: "var(--font-mono)",
+        letterSpacing: "0.06em",
+      }}
+    >
+      <p style={{ color: "var(--color-text-primary)", fontSize: 13 }}>
+        {p.volume.toLocaleString()} {unitLabel}
+      </p>
+      <p style={{ color: "var(--color-text-secondary)", fontSize: 11, marginTop: 2 }}>
+        WK OF {p.week.toUpperCase()}
       </p>
     </div>
   );
@@ -208,6 +240,11 @@ function ExerciseSearchSelect({
   );
 }
 
+/** Commonly cited weekly set range per muscle group for hypertrophy. A
+ *  reference band, deliberately not a target — training age, exercise
+ *  selection and recovery all move it. */
+const HYPERTROPHY_BAND = { min: 10, max: 20 };
+
 export function ProgressCharts() {
   const [selectedExerciseId, setSelectedExerciseId] = useState<string>("");
   const [range, setRange] = useState<"3m" | "6m" | "1y" | "all">("3m");
@@ -216,6 +253,7 @@ export function ProgressCharts() {
   const { data: exercises } = useLoggedExercises();
   const { data: strengthData, isLoading: strengthLoading } = useStrengthHistory(selectedExerciseId || null);
   const { data: workouts } = useWorkouts(200);
+  const { data: weeklyVolume } = useWeeklyVolume(12);
 
   // Default to the first logged exercise once the list arrives
   useEffect(() => {
@@ -295,9 +333,10 @@ export function ProgressCharts() {
         const d = new Date(w.started_at);
         return d >= weekStart && d <= weekEnd;
       });
+      // Drops don't count as sets — one dropset is one working set.
       const setCount = weekWorkouts.reduce((sum, w) => {
-        const sets = (w.workout_sets as Array<unknown>) ?? [];
-        return sum + sets.length;
+        const sets = (w.workout_sets as Array<{ parent_set_id?: string | null }>) ?? [];
+        return sum + sets.filter((s) => s.parent_set_id == null).length;
       }, 0);
       weeks.push({ week: format(weekStart, "MMM d"), sets: setCount });
     }
@@ -321,10 +360,10 @@ export function ProgressCharts() {
     for (const w of workouts) {
       const d = new Date(w.started_at);
       if (d < muscleWeekStart || d > muscleWeekEnd) continue;
-      const sets = (w.workout_sets as Array<{ exercises?: { muscle_group?: string } | null }>) ?? [];
+      const sets = (w.workout_sets as Array<{ exercises?: { muscle_group?: string } | null; parent_set_id?: string | null }>) ?? [];
       for (const s of sets) {
         const mg = s.exercises?.muscle_group;
-        if (!mg) continue;
+        if (!mg || s.parent_set_id != null) continue;
         counts.set(mg, (counts.get(mg) ?? 0) + 1);
       }
     }
@@ -334,6 +373,22 @@ export function ProgressCharts() {
   }, [workouts, muscleWeekStart, muscleWeekEnd]);
 
   const maxMuscleSets = Math.max(1, ...muscleGroupData.map((m) => m.sets));
+
+  // Fixed headroom above the band so a light week doesn't rescale the track and
+  // make 4 sets look like it fills the range. The band has to sit still to mean
+  // anything week to week.
+  const muscleScaleMax = Math.max(maxMuscleSets, HYPERTROPHY_BAND.max + 2);
+
+  // Tonnage is stored in kg; convert once here so the axis, tooltip and label
+  // all read in the user's unit.
+  const volumeData = useMemo(
+    () =>
+      weeklyVolume.map((w) => ({
+        week: format(new Date(w.week), "MMM d"),
+        volume: Math.round(fromKg(w.volumeKg, unit)),
+      })),
+    [weeklyVolume, unit]
+  );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderDot = (props: any) => {
@@ -360,6 +415,8 @@ export function ProgressCharts() {
 
   return (
     <div className="space-y-6">
+      {/* Leads the page: the only figure here that says what to change today. */}
+      <ReadyToProgress />
       {/* FIG. 1 — strength plot */}
       <div className="sheet p-6">
         <div className="flex flex-col gap-3 mb-5">
@@ -493,6 +550,46 @@ export function ProgressCharts() {
         )}
       </div>
 
+      {/* FIG. 2b — weekly tonnage. Set counts alone treat 3×95 and 3×135 as
+          identical work; this is the figure that notices the difference. */}
+      <div className="sheet p-6">
+        <div className="mb-5">
+          <p className="fig-label mb-1">Weekly volume</p>
+          <p className="label-caps" style={{ fontSize: 11 }}>
+            Total load moved · Σ(weight × reps) · {label}
+          </p>
+        </div>
+        {volumeData.every((d) => d.volume === 0) ? (
+          <div className="h-48 flex items-center justify-center">
+            <p style={{ color: "var(--color-text-ghost)", fontSize: 14 }}>No load on record yet.</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={volumeData} barCategoryGap="28%" margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
+              <CartesianGrid stroke="var(--color-line)" strokeWidth={0.5} vertical={false} />
+              <XAxis dataKey="week" tick={AXIS_TICK} axisLine={{ stroke: "var(--color-line-bright)" }} tickLine={false} />
+              <YAxis
+                tick={AXIS_TICK}
+                axisLine={{ stroke: "var(--color-line-bright)" }}
+                tickLine={false}
+                width={44}
+                tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v)))}
+              />
+              <Tooltip content={<VolumeTooltip unitLabel={label} />} cursor={{ fill: "rgba(143, 180, 217, 0.06)" }} />
+              <Bar dataKey="volume" fill="url(#bp-bar-hatch)">
+                {volumeData.map((_, i) => (
+                  <Cell
+                    key={i}
+                    stroke={i === volumeData.length - 1 ? "var(--color-paper)" : "var(--color-line-bright)"}
+                    strokeWidth={i === volumeData.length - 1 ? 1.25 : 1}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
       {/* FIG. 3 — sets by muscle group, paged by calendar week */}
       <div className="sheet p-6">
         <div className="flex items-center justify-between mb-5">
@@ -501,6 +598,7 @@ export function ProgressCharts() {
             <p className="label-caps" style={{ fontSize: 11 }}>
               {format(muscleWeekStart, "MMM d")} – {format(muscleWeekEnd, "MMM d")}
               {isCurrentMuscleWeek && " · THIS WEEK"}
+              {" · SHADED "}{HYPERTROPHY_BAND.min}–{HYPERTROPHY_BAND.max} REF
             </p>
           </div>
           <div className="flex gap-1 shrink-0">
@@ -541,10 +639,22 @@ export function ProgressCharts() {
                   {MUSCLE_GROUP_LABELS[m.muscle_group as keyof typeof MUSCLE_GROUP_LABELS] ?? m.muscle_group}
                 </span>
                 <div className="flex-1 h-5 relative" style={{ backgroundColor: "var(--color-sheet-inset)", borderRadius: 1 }}>
+                  {/* Commonly cited hypertrophy range. Shaded rather than
+                      colour-coded: it's a reference, not a target the app is
+                      entitled to grade you against. */}
                   <div
-                    className="h-full transition-all duration-300"
+                    className="absolute inset-y-0 pointer-events-none"
                     style={{
-                      width: `${(m.sets / maxMuscleSets) * 100}%`,
+                      left: `${(HYPERTROPHY_BAND.min / muscleScaleMax) * 100}%`,
+                      width: `${((HYPERTROPHY_BAND.max - HYPERTROPHY_BAND.min) / muscleScaleMax) * 100}%`,
+                      backgroundColor: "var(--color-line-bright)",
+                      opacity: 0.28,
+                    }}
+                  />
+                  <div
+                    className="h-full transition-all duration-300 relative"
+                    style={{
+                      width: `${Math.min(100, (m.sets / muscleScaleMax) * 100)}%`,
                       backgroundColor: "var(--color-paper)",
                       opacity: 0.85,
                       borderRadius: 1,

@@ -17,7 +17,7 @@ struct BodyView: View {
         guard let weekAgo = Calendar.current.date(byAdding: .weekOfYear, value: -1, to: Date()) else { return [:] }
         var result: [String: Int] = [:]
         for w in workout.workouts where w.startedAt >= weekAgo {
-            for s in w.workoutSets ?? [] {
+            for s in w.workoutSets ?? [] where s.parentSetId == nil {
                 guard let mg = s.exercise?.muscleGroup else { continue }
                 result[mg, default: 0] += 1
             }

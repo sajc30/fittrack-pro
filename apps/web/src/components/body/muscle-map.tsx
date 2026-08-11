@@ -139,6 +139,9 @@ export function MuscleMapCard() {
     for (const w of workouts ?? []) {
       if (new Date(w.started_at) < cutoff) continue;
       for (const s of w.workout_sets ?? []) {
+        // Drops don't count — a dropset is one working set, however many
+        // drops hang off it. Mirrors BodyView.swift.
+        if ((s as { parent_set_id?: string | null }).parent_set_id != null) continue;
         const mg = s.exercises?.muscle_group as string | undefined;
         if (mg) result[mg] = (result[mg] ?? 0) + 1;
       }

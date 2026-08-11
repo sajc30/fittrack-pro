@@ -1,44 +1,74 @@
 "use client";
 
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { searchExercises } from "@fittrack/shared";
 import { createClient } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/database.types";
 
 type MuscleGroup = Database["public"]["Enums"]["muscle_group"] | "all";
 type Equipment  = Database["public"]["Enums"]["equipment_type"] | "all";
 
-export function useExercises(
-  muscleGroup: MuscleGroup = "all",
-  search = "",
-  equipment: Equipment = "all"
-) {
+/** The columns the catalog query selects — keep the two in sync. */
+export type CatalogExercise = Pick<
+  Database["public"]["Tables"]["exercises"]["Row"],
+  | "id"
+  | "name"
+  | "muscle_group"
+  | "secondary_muscles"
+  | "equipment"
+  | "is_custom"
+  | "movement_pattern"
+>;
+
+/**
+ * The whole catalog in the columns the pickers actually read — ~130 KB for 730
+ * rows, versus 600 KB for `select("*")`. Fetched once and held, so filtering
+ * and fuzzy search run locally instead of hitting Postgres per keystroke.
+ */
+export function useExerciseCatalog() {
   const supabase = createClient();
 
-  return useQuery({
-    queryKey: ["exercises", muscleGroup, search, equipment],
+  return useQuery<CatalogExercise[]>({
+    queryKey: ["exercise-catalog"],
+    staleTime: 60 * 60 * 1000, // catalog is effectively static within a session
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from("exercises")
-        .select("*")
+        .select("id, name, muscle_group, secondary_muscles, equipment, is_custom, movement_pattern")
         .order("name", { ascending: true });
 
-      if (muscleGroup !== "all") {
-        query = query.eq("muscle_group", muscleGroup);
-      }
-
-      if (equipment !== "all") {
-        query = query.eq("equipment", equipment);
-      }
-
-      if (search.trim()) {
-        query = query.ilike("name", `%${search.trim()}%`);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
       return data ?? [];
     },
   });
+}
+
+/**
+ * Catalog narrowed by muscle/equipment, then ranked by fuzzy name match.
+ * `trainedIds` breaks ties between equally-close typo matches in favour of
+ * exercises the user actually does.
+ */
+export function useExercises(
+  muscleGroup: MuscleGroup = "all",
+  search = "",
+  equipment: Equipment = "all",
+  trainedIds?: Set<string>
+) {
+  const { data, isLoading } = useExerciseCatalog();
+
+  const filtered = useMemo(() => {
+    const pool = (data ?? []).filter(
+      (ex) =>
+        (muscleGroup === "all" || ex.muscle_group === muscleGroup) &&
+        (equipment === "all" || ex.equipment === equipment)
+    );
+    return searchExercises(pool, search, {
+      prefer: trainedIds && ((ex) => trainedIds.has(ex.id)),
+    });
+  }, [data, muscleGroup, search, equipment, trainedIds]);
+
+  return { data: filtered, isLoading };
 }
 
 export function useCreateExercise() {

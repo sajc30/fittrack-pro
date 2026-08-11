@@ -28,6 +28,10 @@ struct ProgressView_: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         pageHeader
+                        // Leads the page: the only card here that says what to
+                        // change today, rather than what already happened.
+                        ReadyToProgressCard()
+                            .padding(.horizontal, 20)
                         StrengthCard(selectedExerciseId: $selectedExerciseId, range: $range)
                             .padding(.horizontal, 20)
                         WeeklySetsCard()
@@ -45,6 +49,7 @@ struct ProgressView_: View {
             guard let uid = auth.session?.user.id else { return }
             await workout.loadExercises()
             if workout.workouts.isEmpty { await workout.loadWorkouts(userId: uid) }
+            await workout.loadExerciseContext()   // feeds the LAST SESSION cell
             selectFirstLoggedExercise()
         }
         .onChange(of: workout.workouts.count)  { _, _ in selectFirstLoggedExercise() }
@@ -132,6 +137,18 @@ private struct StrengthCard: View {
                     Divider().frame(height: 32).background(Color.bpLine)
                     StatCell(label: "BEST SET", value: "\(String(format: "%.1f", displayWeight(stats.bestWeightKg))) \(unitLabel) × \(stats.bestReps)")
                 }
+                // Its own row: four cells across 402pt truncates both weight
+                // values to "100.0 LBS ×…", which is worse than no cell at all.
+                if let last = lastSession {
+                    Divider().background(Color.bpLine)
+                    HStack {
+                        Text("LAST SESSION").figLabel(size: 9)
+                        Spacer()
+                        Text(last)
+                            .font(.blueprint(12))
+                            .foregroundStyle(Color.bpTextPrimary)
+                    }
+                }
             }
         }
     }
@@ -147,11 +164,25 @@ private struct StrengthCard: View {
                       w.startedAt >= cutoff, reps > 0 else { continue }
                 totalSets += 1
                 totalReps += reps
-                let e1rm = epley1RM(kg: kg, reps: reps)
+                let e1rm = estimateOneRepMax(kg: kg, reps: reps)
                 if e1rm > bestE1rm { bestE1rm = e1rm; bestWeightKg = kg; bestReps = reps }
             }
         }
         return totalSets > 0 ? (totalSets, totalReps, bestWeightKg, bestReps) : nil
+    }
+
+    /// "65.0 LBS × 10 · 3 AUG" — the top set of the most recent session.
+    /// Answers "what did I actually use last time" without reading the plot.
+    private var lastSession: String? {
+        guard let exId = selectedExerciseId,
+              let ctx = workout.exerciseContext[exId],
+              let sets = ctx.lastSets, !sets.isEmpty else { return nil }
+
+        let top = sets.max { ($0.weightKg ?? 0) < ($1.weightKg ?? 0) }
+        guard let kg = top?.weightKg, let reps = top?.reps else { return nil }
+
+        let date = ctx.lastPerformedAt.formatted(.dateTime.month(.abbreviated).day()).uppercased()
+        return "\(String(format: "%.1f", displayWeight(kg))) \(unitLabel) × \(reps) · \(date)"
     }
 
     private var loggedExercises: [Exercise] {
@@ -191,7 +222,7 @@ private struct StrengthCard: View {
             for s in w.workoutSets ?? [] where s.exerciseId == exId {
                 guard let kg = s.weightKg, let reps = s.reps,
                       w.startedAt >= cutoff, reps > 0 else { continue }
-                let e1rm = epley1RM(kg: kg, reps: reps)
+                let e1rm = estimateOneRepMax(kg: kg, reps: reps)
                 let day  = Calendar.current.startOfDay(for: w.startedAt)
                 let key  = day.timeIntervalSince1970
                 if let cur = byDay[key], cur.e1rm >= e1rm { continue }
@@ -305,13 +336,36 @@ private struct LoggedExercisePickerSheet: View {
 
 struct E1rmPoint { let date: Date; let e1rm: Double; let isPR: Bool; let weightKg: Double; let reps: Int }
 
-private func epley1RM(kg: Double, reps: Int) -> Double {
-    kg / (1.0278 - 0.0278 * Double(reps))
+/// Epley. Must stay identical to `estimateOneRepMax` in packages/shared and to
+/// `recalc_personal_record` in 002_pr_integrity.sql — this plot is read against
+/// PR values the database computed, so a different formula makes the chart
+/// disagree with the PR stamp sitting next to it.
+private func estimateOneRepMax(kg: Double, reps: Int) -> Double {
+    reps == 1 ? kg : (kg * (1 + Double(reps) / 30)).rounded()
 }
 
 private struct E1rmChartContent: View {
     let data: [E1rmPoint]
     let displayWeight: (Double) -> Double
+    private let unitLabel = "LBS"
+
+    /// Drag-to-scrub via iOS 17's chartXSelection — no gesture plumbing — with
+    /// content matching the web tooltip so both platforms read the same.
+    ///
+    /// Deliberately transient: the callout follows your finger and clears when
+    /// you lift it. An earlier version pinned the last value, on the theory that
+    /// the numbers sat under your thumb — but the annotation renders above the
+    /// touch point, so they never did, and a callout that stays put with no way
+    /// to dismiss reads as a bug. Tap-to-dismiss isn't an option either: the
+    /// chart's own selection gesture consumes the tap and re-selects.
+    @State private var scrubbedDate: Date?
+
+    private var scrubbed: E1rmPoint? {
+        guard let scrubbedDate else { return nil }
+        return data.min { a, b in
+            abs(a.date.timeIntervalSince(scrubbedDate)) < abs(b.date.timeIntervalSince(scrubbedDate))
+        }
+    }
 
     var body: some View {
         if data.count < 2 {
@@ -326,7 +380,19 @@ private struct E1rmChartContent: View {
                 PointMark(x: .value("Date", p.date), y: .value("E1RM", displayWeight(p.e1rm)))
                     .foregroundStyle(p.isPR ? Color.bpRedline : Color.bpPaper)
                     .symbolSize(p.isPR ? 36 : 16)
+
+                if let s = scrubbed, s.date == p.date {
+                    RuleMark(x: .value("Date", s.date))
+                        .foregroundStyle(Color.bpLineBright)
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                        // Fit on both axes: unconstrained, the callout escapes the
+                        // plot and covers the exercise picker above it.
+                        .annotation(position: .top, spacing: 2, overflowResolution: .init(x: .fit, y: .fit)) {
+                            scrubCallout(s)
+                        }
+                }
             }
+            .chartXSelection(value: $scrubbedDate)
             .chartXAxis {
                 AxisMarks { _ in
                     AxisValueLabel().font(.blueprint(9)).foregroundStyle(Color.bpTextGhost)
@@ -340,6 +406,129 @@ private struct E1rmChartContent: View {
             .chartPlotStyle { $0.background(Color.clear) }
             .frame(height: 180)
         }
+    }
+
+    /// Mirrors the web's StrengthTooltip: the estimate, the set that produced
+    /// it, the date, and a record stamp.
+    @ViewBuilder
+    private func scrubCallout(_ p: E1rmPoint) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(String(format: "%.0f", displayWeight(p.e1rm))) \(unitLabel)")
+                .font(.blueprint(12, weight: .semibold))
+                .foregroundStyle(Color.bpTextPrimary)
+            Text("\(String(format: "%.1f", displayWeight(p.weightKg))) × \(p.reps)")
+                .font(.blueprint(10))
+                .foregroundStyle(Color.bpTextSecondary)
+            Text(p.date.formatted(.dateTime.month(.abbreviated).day()).uppercased())
+                .font(.blueprint(9))
+                .foregroundStyle(Color.bpTextGhost)
+            if p.isPR {
+                Text("RECORD").font(.blueprint(9, weight: .semibold))
+                    .tracking(1).foregroundStyle(Color.bpRedline)
+            }
+        }
+        .padding(.horizontal, 8).padding(.vertical, 6)
+        .background(Color.bpSheetRaised)
+        .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.bpLineBright, lineWidth: 1))
+    }
+}
+
+// MARK: - Ready to progress
+
+/// Double progression, surfaced. Mirrors the web card: leads with the exercises
+/// that earned a load increase and collapses the rest, because the page should
+/// answer "what do I change today" and for most lifts the answer is "nothing".
+private struct ReadyToProgressCard: View {
+    @Environment(WorkoutViewModel.self) private var workout
+    @Environment(ProfileViewModel.self) private var profile
+    @State private var showRest = false
+
+    private var items: [WorkoutViewModel.ExerciseProgress] {
+        workout.progression(repMin: profile.profile?.targetRepMin ?? 8,
+                            repMax: profile.profile?.targetRepMax ?? 10)
+    }
+
+    private func lbs(_ kg: Double) -> String {
+        String(format: "%.0f", Units.toLbs(kg))
+    }
+
+    var body: some View {
+        let all = items
+        let ready    = all.filter { $0.assessment.readiness == .addLoad }
+        let holding  = all.filter { $0.assessment.readiness == .keepGoing }
+        let building = all.filter { $0.assessment.readiness == .buildReps }
+
+        if !all.isEmpty {
+            SheetCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("READY TO PROGRESS").figLabel(size: 10)
+                            Text("EVERY WORKING SET CLEARED YOUR REP RANGE")
+                                .font(.blueprint(9)).foregroundStyle(Color.bpTextGhost)
+                        }
+                        Spacer()
+                        Text("\(ready.count) OF \(all.count)")
+                            .font(.blueprint(10)).foregroundStyle(Color.bpTextSecondary)
+                    }
+
+                    Divider().background(Color.bpLine)
+
+                    if ready.isEmpty {
+                        Text("Nothing due for a load increase — hold what you're on and keep pushing reps.")
+                            .font(.blueprint(11)).foregroundStyle(Color.bpTextGhost)
+                    } else {
+                        ForEach(ready) { row($0, highlighted: true) }
+                    }
+
+                    if !holding.isEmpty || !building.isEmpty {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.15)) { showRest.toggle() }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: showRest ? "chevron.up" : "chevron.down")
+                                    .font(.system(size: 9))
+                                Text("\(holding.count) HOLDING · \(building.count) BUILDING REPS")
+                                    .font(.blueprint(9)).tracking(1)
+                                Spacer()
+                            }
+                            .foregroundStyle(Color.bpTextGhost)
+                            .frame(minHeight: 44) // thumb target, not a text link
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        if showRest {
+                            ForEach(holding + building) { row($0, highlighted: false) }
+                        }
+                    }
+                }
+                .padding(18)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ item: WorkoutViewModel.ExerciseProgress, highlighted: Bool) -> some View {
+        let a = item.assessment
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(item.name)
+                    .font(.blueprint(12))
+                    .foregroundStyle(highlighted ? Color.bpTextPrimary : Color.bpTextSecondary)
+                    .lineLimit(1)
+                Spacer()
+                if highlighted, let next = a.suggestedWeightKg {
+                    Text("→ \(lbs(next)) LBS")
+                        .font(.blueprint(12, weight: .semibold))
+                        .foregroundStyle(Color.bpTextPrimary)
+                }
+            }
+            Text("\(a.lowestReps ?? 0) reps at \(a.lastWeightKg.map(lbs) ?? "—") LBS · target \(a.range.min)–\(a.range.max)\(a.range.inferred ? " (from your history)" : "")")
+                .font(.blueprint(9))
+                .foregroundStyle(Color.bpTextGhost)
+        }
+        .padding(.vertical, 5)
     }
 }
 
@@ -389,7 +578,8 @@ private struct WeeklySetsCard: View {
             var count = 0
             for w in workout.workouts {
                 guard w.startedAt >= weekStart && w.startedAt < nextWeek else { continue }
-                count += (w.workoutSets ?? []).count
+                // Drops don't count — a dropset is one working set.
+                count += (w.workoutSets ?? []).filter { $0.parentSetId == nil }.count
             }
             let label = weekStart.formatted(.dateTime.month(.abbreviated).day()).uppercased()
             result.append(WeekBar(label: label, count: Double(count), isCurrent: weeksAgo == 0))
@@ -401,6 +591,11 @@ private struct WeeklySetsCard: View {
 // MARK: - FIG. 3 — Sets by muscle group, paged by calendar week
 
 private struct MuscleGroupSetsCard: View {
+    /// Commonly cited weekly set range per muscle group for hypertrophy. A
+    /// reference band, deliberately not a target — training age, exercise
+    /// selection and recovery all move it. Mirrors the web constant.
+    static let band = (min: 10, max: 20)
+
     @Environment(WorkoutViewModel.self) private var workout
     // 0 = current week, increasing = further back. A rolling "last 7 days" window
     // would cut a calendar week in half depending on what day it is; paging by
@@ -421,7 +616,7 @@ private struct MuscleGroupSetsCard: View {
         var counts: [String: Int] = [:]
         for w in workout.workouts {
             guard w.startedAt >= weekStart, w.startedAt < weekEnd else { continue }
-            for s in w.workoutSets ?? [] {
+            for s in w.workoutSets ?? [] where s.parentSetId == nil {
                 guard let mg = s.exercise?.muscleGroup else { continue }
                 counts[mg, default: 0] += 1
             }
@@ -441,7 +636,8 @@ private struct MuscleGroupSetsCard: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("SETS BY MUSCLE GROUP").figLabel(size: 10)
-                        Text(weekRangeLabel + (isCurrentWeek ? " · THIS WEEK" : ""))
+                        Text(weekRangeLabel + (isCurrentWeek ? " · THIS WEEK" : "")
+                             + " · SHADED \(Self.band.min)–\(Self.band.max) REF")
                             .font(.blueprint(9)).foregroundStyle(Color.bpTextGhost)
                     }
                     Spacer()
@@ -471,7 +667,10 @@ private struct MuscleGroupSetsCard: View {
                         .font(.blueprint(12)).foregroundStyle(Color.bpTextGhost)
                         .frame(maxWidth: .infinity).padding(.vertical, 24)
                 } else {
-                    let maxSets = data.map(\.sets).max() ?? 1
+                    // Fixed headroom above the band so a light week doesn't rescale
+                    // the track and make 4 sets look like it fills the range. The
+                    // band has to sit still to mean anything week to week.
+                    let scaleMax = max(data.map(\.sets).max() ?? 1, Self.band.max + 2)
                     VStack(spacing: 8) {
                         ForEach(data, id: \.muscle) { row in
                             HStack(spacing: 10) {
@@ -479,9 +678,17 @@ private struct MuscleGroupSetsCard: View {
                                     .figLabel(size: 9)
                                     .frame(width: 76, alignment: .leading)
                                 GeometryReader { geo in
-                                    RoundedRectangle(cornerRadius: 1)
-                                        .fill(Color.bpPaper.opacity(0.85))
-                                        .frame(width: geo.size.width * CGFloat(row.sets) / CGFloat(maxSets))
+                                    ZStack(alignment: .leading) {
+                                        // Commonly cited hypertrophy range. Shaded, not
+                                        // colour-coded: a reference, not a grade.
+                                        Rectangle()
+                                            .fill(Color.bpLineBright.opacity(0.28))
+                                            .frame(width: geo.size.width * CGFloat(Self.band.max - Self.band.min) / CGFloat(scaleMax))
+                                            .offset(x: geo.size.width * CGFloat(Self.band.min) / CGFloat(scaleMax))
+                                        RoundedRectangle(cornerRadius: 1)
+                                            .fill(Color.bpPaper.opacity(0.85))
+                                            .frame(width: geo.size.width * CGFloat(min(row.sets, scaleMax)) / CGFloat(scaleMax))
+                                    }
                                 }
                                 .frame(height: 18)
                                 .background(Color.bpSheetInset)
