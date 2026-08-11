@@ -81,6 +81,13 @@ struct MainTabView: View {
         .sheet(isPresented: $workout.showActiveSession) {
             ActiveWorkoutView()
         }
+        // Presented here, not from ActiveWorkoutView: closing out dismisses that
+        // sheet, so a cover owned by it would race its own dismissal.
+        .fullScreenCover(item: $workout.sessionSummary) { summary in
+            SessionSummarySheet(data: summary, unitLabel: "LBS") {
+                workout.sessionSummary = nil
+            }
+        }
     }
 }
 
