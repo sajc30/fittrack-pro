@@ -24,6 +24,25 @@ export const MUSCLE_GROUP_LABELS: Record<MuscleGroup, string> = {
   cardio: "Cardio",
 };
 
+/**
+ * Movement patterns, per the `movement_pattern` enum in migration 004. The
+ * column is nullable on purpose — a rule-based seed can't classify everything —
+ * so callers must handle a missing pattern rather than defaulting to one.
+ */
+export const MOVEMENT_PATTERN_LABELS: Record<string, string> = {
+  horizontal_push: "Horizontal push",
+  vertical_push: "Vertical push",
+  horizontal_pull: "Horizontal pull",
+  vertical_pull: "Vertical pull",
+  squat: "Squat",
+  hinge: "Hinge",
+  lunge: "Lunge",
+  carry: "Carry",
+  isolation: "Isolation",
+  core: "Core",
+  cardio: "Cardio",
+};
+
 export const MUSCLE_GROUP_ORDER: MuscleGroup[] = [
   "chest",
   "back",
