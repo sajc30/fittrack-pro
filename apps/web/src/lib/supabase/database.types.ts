@@ -67,6 +67,7 @@ export type Database = {
           image_url: string | null
           instructions: string[]
           is_custom: boolean
+          movement_pattern: Database["public"]["Enums"]["movement_pattern"] | null
           muscle_group: Database["public"]["Enums"]["muscle_group"]
           name: string
           secondary_muscles: Database["public"]["Enums"]["muscle_group"][]
@@ -82,6 +83,7 @@ export type Database = {
           image_url?: string | null
           instructions?: string[]
           is_custom?: boolean
+          movement_pattern?: Database["public"]["Enums"]["movement_pattern"] | null
           muscle_group: Database["public"]["Enums"]["muscle_group"]
           name: string
           secondary_muscles?: Database["public"]["Enums"]["muscle_group"][]
@@ -97,6 +99,7 @@ export type Database = {
           image_url?: string | null
           instructions?: string[]
           is_custom?: boolean
+          movement_pattern?: Database["public"]["Enums"]["movement_pattern"] | null
           muscle_group?: Database["public"]["Enums"]["muscle_group"]
           name?: string
           secondary_muscles?: Database["public"]["Enums"]["muscle_group"][]
@@ -196,6 +199,8 @@ export type Database = {
           height_cm: number | null
           id: string
           name: string
+          target_rep_max: number
+          target_rep_min: number
           updated_at: string
           user_id: string
           weight_kg: number | null
@@ -210,6 +215,8 @@ export type Database = {
           height_cm?: number | null
           id?: string
           name?: string
+          target_rep_max?: number
+          target_rep_min?: number
           updated_at?: string
           user_id: string
           weight_kg?: number | null
@@ -224,6 +231,8 @@ export type Database = {
           height_cm?: number | null
           id?: string
           name?: string
+          target_rep_max?: number
+          target_rep_min?: number
           updated_at?: string
           user_id?: string
           weight_kg?: number | null
@@ -284,10 +293,12 @@ export type Database = {
           is_pr: boolean
           logged_at: string
           notes: string | null
+          parent_set_id: string | null
           reps: number | null
           rpe: number | null
           set_number: number
           set_type: Database["public"]["Enums"]["set_type"]
+          superset_group: number | null
           weight_kg: number | null
           workout_id: string
         }
@@ -299,10 +310,12 @@ export type Database = {
           is_pr?: boolean
           logged_at?: string
           notes?: string | null
+          parent_set_id?: string | null
           reps?: number | null
           rpe?: number | null
           set_number: number
           set_type?: Database["public"]["Enums"]["set_type"]
+          superset_group?: number | null
           weight_kg?: number | null
           workout_id: string
         }
@@ -314,10 +327,12 @@ export type Database = {
           is_pr?: boolean
           logged_at?: string
           notes?: string | null
+          parent_set_id?: string | null
           reps?: number | null
           rpe?: number | null
           set_number?: number
           set_type?: Database["public"]["Enums"]["set_type"]
+          superset_group?: number | null
           weight_kg?: number | null
           workout_id?: string
         }
@@ -411,23 +426,37 @@ export type Database = {
       }
     }
     Views: {
-      latest_workouts: {
+      exercise_last_performance: {
         Row: {
-          created_at: string | null
-          duration_minutes: number | null
-          finished_at: string | null
-          id: string | null
-          name: string | null
-          notes: string | null
-          started_at: string | null
-          template_id: string | null
+          exercise_id: string | null
+          last_performed_at: string | null
+          last_sets: Json | null
+          last_workout_id: string | null
           user_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "workout_sets_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workout_sets_workout_id_fkey"
+            columns: ["last_workout_id"]
+            isOneToOne: false
+            referencedRelation: "workouts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
-      [_ in never]: never
+      recalc_personal_record: {
+        Args: { p_exercise: string; p_user: string }
+        Returns: undefined
+      }
     }
     Enums: {
       activity_level:
@@ -453,6 +482,18 @@ export type Database = {
         | "lift_target"
         | "body_fat_target"
         | "workout_frequency"
+      movement_pattern:
+        | "horizontal_push"
+        | "vertical_push"
+        | "horizontal_pull"
+        | "vertical_pull"
+        | "squat"
+        | "hinge"
+        | "lunge"
+        | "carry"
+        | "isolation"
+        | "core"
+        | "cardio"
       muscle_group:
         | "chest"
         | "back"
