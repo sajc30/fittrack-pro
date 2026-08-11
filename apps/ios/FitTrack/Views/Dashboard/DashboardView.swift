@@ -34,7 +34,7 @@ struct DashboardView: View {
         let lastWeekStart = cal.date(byAdding: .weekOfYear, value: -1, to: weekStart)!
         var thisWeek = 0, lastWeek = 0
         for w in workout.workouts {
-            for s in w.workoutSets ?? [] {
+            for s in w.workoutSets ?? [] where s.parentSetId == nil {
                 if s.loggedAt >= weekStart { thisWeek += 1 }
                 else if s.loggedAt >= lastWeekStart { lastWeek += 1 }
             }

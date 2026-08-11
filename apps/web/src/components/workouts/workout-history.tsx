@@ -32,7 +32,23 @@ interface WorkoutSet {
   weight_kg: number | null;
   is_pr: boolean;
   rpe?: number | null;
+  /** Non-null on a drop — it belongs to the working set with this id. */
+  parent_set_id?: string | null;
+  superset_group?: number | null;
   exercises?: { name: string; muscle_group: string } | null;
+}
+
+/** Drops ride along with the set above them; they're never counted separately. */
+const isDrop = (s: WorkoutSet) => s.parent_set_id != null;
+
+/** Working sets in order, each followed by its drops. The nested select gives
+ *  no ordering guarantee, so a chain has to be rebuilt rather than assumed. */
+function chainOrder(sets: WorkoutSet[]): WorkoutSet[] {
+  const drops = sets.filter(isDrop);
+  return sets
+    .filter((s) => !isDrop(s))
+    .sort((a, b) => a.set_number - b.set_number)
+    .flatMap((p) => [p, ...drops.filter((d) => d.parent_set_id === p.id)]);
 }
 
 interface Workout {
@@ -218,6 +234,9 @@ function EditWorkoutPanel({
   const buildDraft = (): ExBlock[] => {
     const map: Record<string, ExBlock> = {};
     for (const s of workout.workout_sets) {
+      // Drops stay out of revision: they'd get renumbered as working sets here,
+      // and the active session is where a chain is built and corrected.
+      if (isDrop(s)) continue;
       if (!map[s.exercise_id]) {
         map[s.exercise_id] = {
           exerciseId: s.exercise_id,
@@ -240,6 +259,7 @@ function EditWorkoutPanel({
   };
 
   const [blocks, setBlocks] = useState<ExBlock[]>(buildDraft);
+  const hasDrops = workout.workout_sets.some(isDrop);
 
   function handleAddSet(blockIdx: number) {
     const prev = blocks[blockIdx].sets.filter((s) => !s.toDelete).at(-1);
@@ -424,6 +444,13 @@ function EditWorkoutPanel({
         </p>
       )}
 
+      {hasDrops && (
+        <p className="px-5 pt-3 text-xs" style={{ color: "var(--color-text-ghost)" }}>
+          Dropsets aren&apos;t shown here — they stay attached to their working set. Striking a
+          working set removes its dropsets with it.
+        </p>
+      )}
+
       {/* Blocks */}
       <div className="px-5 py-4 space-y-6">
         {blocks.map((block, blockIdx) => {
@@ -479,47 +506,61 @@ function ReadOnlySets({
 
   return (
     <div className="px-5 py-4 space-y-5">
-      {Object.entries(byExercise).map(([id, ex]) => (
-        <div key={id}>
-          <div className="flex items-baseline gap-3 mb-1.5">
-            <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
-              {ex.name}
-            </p>
-            <span className="label-caps" style={{ fontSize: 11 }}>
-              {MUSCLE_GROUP_LABELS[ex.muscle as MuscleGroup] ?? ex.muscle}
-            </span>
-          </div>
+      {Object.entries(byExercise).map(([id, ex]) => {
+        const ordered = chainOrder(ex.sets);
+        const group = ex.sets.find((s) => s.superset_group != null)?.superset_group;
+        let setNo = 0;
+        return (
+          <div key={id}>
+            <div className="flex items-baseline gap-3 mb-1.5">
+              <p className="text-sm font-semibold" style={{ color: "var(--color-text-primary)" }}>
+                {ex.name}
+              </p>
+              <span className="label-caps" style={{ fontSize: 11 }}>
+                {MUSCLE_GROUP_LABELS[ex.muscle as MuscleGroup] ?? ex.muscle}
+              </span>
+              {group != null && (
+                <span className="label-caps" style={{ fontSize: 11, color: "var(--color-text-ghost)" }}>
+                  Superset {String.fromCharCode(64 + group)}
+                </span>
+              )}
+            </div>
 
-          <div>
-            {ex.sets.map((s, i) => (
-              <div
-                key={s.id}
-                className="flex items-center gap-4 py-2 px-2"
-                style={{
-                  borderBottom: i < ex.sets.length - 1 ? "1px solid var(--color-line)" : "none",
-                }}
-              >
-                <span
-                  className="font-display w-5 text-center shrink-0"
-                  style={{ color: "var(--color-text-ghost)", fontSize: 12 }}
-                >
-                  {i + 1}
-                </span>
-                <span
-                  className="font-display flex-1"
-                  style={{ color: "var(--color-text-primary)", fontSize: 14 }}
-                >
-                  {s.weight_kg != null ? formatKg(s.weight_kg, unit) : "—"}
-                  <span style={{ color: "var(--color-text-ghost)", fontSize: 12 }}> {label}</span>
-                  <span className="mx-2" style={{ color: "var(--color-text-ghost)" }}>×</span>
-                  {s.reps ?? "—"}
-                </span>
-                {s.is_pr && <span className="stamp shrink-0">PR</span>}
-              </div>
-            ))}
+            <div>
+              {ordered.map((s, i) => {
+                const drop = isDrop(s);
+                if (!drop) setNo += 1;
+                return (
+                  <div
+                    key={s.id}
+                    className="flex items-center gap-4 py-2 px-2"
+                    style={{
+                      borderBottom: i < ordered.length - 1 ? "1px solid var(--color-line)" : "none",
+                    }}
+                  >
+                    <span
+                      className="font-display w-5 text-center shrink-0"
+                      style={{ color: "var(--color-text-ghost)", fontSize: 12 }}
+                    >
+                      {drop ? "↳" : setNo}
+                    </span>
+                    <span
+                      className="font-display flex-1"
+                      style={{ color: "var(--color-text-primary)", fontSize: 14, opacity: drop ? 0.7 : 1 }}
+                    >
+                      {s.weight_kg != null ? formatKg(s.weight_kg, unit) : "—"}
+                      <span style={{ color: "var(--color-text-ghost)", fontSize: 12 }}> {label}</span>
+                      <span className="mx-2" style={{ color: "var(--color-text-ghost)" }}>×</span>
+                      {s.reps ?? "—"}
+                    </span>
+                    {s.is_pr && <span className="stamp shrink-0">PR</span>}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -539,7 +580,9 @@ function WorkoutCard({ workout, sessionNo }: { workout: Workout; sessionNo: numb
 
   const sets      = workout.workout_sets;
   const prCount   = sets.filter((s) => s.is_pr).length;
+  // Reps count every row; sets count only working sets.
   const totalReps = sets.reduce((sum, s) => sum + (s.reps ?? 0), 0);
+  const setCount  = sets.filter((s) => !isDrop(s)).length;
 
   const byExercise = sets.reduce<Record<string, { name: string; muscle: string; sets: WorkoutSet[] }>>((acc, s) => {
     const id = s.exercise_id;
@@ -711,7 +754,7 @@ function WorkoutCard({ workout, sessionNo }: { workout: Workout; sessionNo: numb
                 {workout.duration_minutes} MIN
               </span>
             )}
-            <span>{sets.length} SET{sets.length !== 1 ? "S" : ""}</span>
+            <span>{setCount} SET{setCount !== 1 ? "S" : ""}</span>
             {totalReps > 0 && <span>{totalReps} REP{totalReps !== 1 ? "S" : ""}</span>}
             {prCount > 0 && (
               <span style={{ color: "var(--color-redline)" }}>
@@ -719,6 +762,25 @@ function WorkoutCard({ workout, sessionNo }: { workout: Workout; sessionNo: numb
               </span>
             )}
           </div>
+        )}
+
+        {/* Session note — the whole point of writing one is reading it back. */}
+        {!editingName && workout.notes && (
+          <p
+            className="mt-2 px-3 py-2"
+            style={{
+              backgroundColor: "var(--color-sheet-inset)",
+              borderLeft: "2px solid var(--color-line)",
+              borderRadius: 2,
+              fontFamily: "var(--font-mono)",
+              fontSize: 12,
+              lineHeight: 1.5,
+              color: "var(--color-text-secondary)",
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {workout.notes}
+          </p>
         )}
 
         {/* Delete confirmation */}
