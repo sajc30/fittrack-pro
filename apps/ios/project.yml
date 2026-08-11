@@ -42,7 +42,7 @@ targets:
       path: FitTrack/Info.plist
       properties:
         CFBundleDisplayName: Iron Blueprint
-        CFBundleShortVersionString: "1.2"
+        CFBundleShortVersionString: "1.3"
         CFBundleVersion: "1"
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
