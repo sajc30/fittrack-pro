@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Plus, Search, X } from "lucide-react";
-import { useExercises } from "@/lib/hooks/use-exercises";
+import { useExercises, useExerciseCatalog, type CatalogExercise } from "@/lib/hooks/use-exercises";
+import { useRecentExercises } from "@/lib/hooks/use-exercise-context";
 import { CreateExerciseForm } from "@/components/exercises/create-exercise-form";
 import { MUSCLE_GROUP_LABELS, MUSCLE_GROUP_ORDER } from "@fittrack/shared";
 import type { Database } from "@/lib/supabase/database.types";
 
-type Exercise   = Database["public"]["Tables"]["exercises"]["Row"];
+type Exercise   = CatalogExercise;
 type MuscleGroup = Database["public"]["Enums"]["muscle_group"];
 type Equipment  = Database["public"]["Enums"]["equipment_type"];
 
@@ -36,10 +37,25 @@ export function ExercisePicker({ onSelect, onClose }: Props) {
   const [tab,       setTab]       = useState<FilterTab>("equipment");
   const [creating,  setCreating]  = useState(false);
 
-  const { data: exercises, isLoading } = useExercises(muscle, search, equipment);
+  const { data: catalog } = useExerciseCatalog();
+  const { data: trained } = useRecentExercises();
+
+  const trainedIds = useMemo(
+    () => new Set((trained ?? []).map((t) => t.id)),
+    [trained]
+  );
+  const { data: exercises, isLoading } = useExercises(muscle, search, equipment, trainedIds);
 
   const activeFilterCount =
     (muscle !== "all" ? 1 : 0) + (equipment !== "all" ? 1 : 0);
+
+  // Only worth showing on an unfiltered list — once you're searching or
+  // filtering, recents are just a second answer competing with your query.
+  const showRecent = !search.trim() && activeFilterCount === 0;
+  const recent = (trained ?? []).slice(0, 8).flatMap((r) => {
+    const match = (catalog ?? []).find((ex) => ex.id === r.id);
+    return match ? [match] : [];
+  });
 
   function clearAll() {
     setMuscle("all");
@@ -127,6 +143,25 @@ export function ExercisePicker({ onSelect, onClose }: Props) {
           />
         </div>
       </div>
+
+      {/* Recent — one tap back to what you actually train */}
+      {showRecent && recent.length > 0 && (
+        <div className="px-5 pb-1 shrink-0">
+          <p className="fig-label mb-2" style={{ fontSize: 9 }}>Recent</p>
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {recent.map((ex) => (
+              <button
+                key={ex.id}
+                onClick={() => onSelect(ex)}
+                className="px-3 py-1.5 whitespace-nowrap shrink-0 transition-all duration-150 hover:bg-[var(--color-sheet-raised)]"
+                style={chip(false)}
+              >
+                {ex.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div className="px-5 pb-2 shrink-0">

@@ -18,6 +18,8 @@ export function fromKg(kg: number, unit: WeightUnit): number {
 }
 
 export function formatKg(kg: number, unit: WeightUnit): string {
-  const v = fromKg(kg, unit);
+  // Round before deciding on a decimal: 100 lb is stored as 45.36 kg, which
+  // converts back to 99.9995 and would otherwise render as "100.0".
+  const v = Math.round(fromKg(kg, unit) * 10) / 10;
   return v % 1 === 0 ? v.toFixed(0) : v.toFixed(1);
 }

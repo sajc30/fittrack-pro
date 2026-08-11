@@ -45,26 +45,3 @@ export function useExercisePRs(exerciseId: string | null) {
     },
   });
 }
-
-export function usePreviousSets(exerciseId: string | null) {
-  const supabase = createClient();
-
-  return useQuery({
-    queryKey: ["previous-sets", exerciseId],
-    enabled: !!exerciseId,
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !exerciseId) return [];
-
-      const { data } = await supabase
-        .from("workout_sets")
-        .select("*, workouts!inner(user_id, started_at)")
-        .eq("exercise_id", exerciseId)
-        .eq("workouts.user_id", user.id)
-        .order("logged_at", { ascending: false })
-        .limit(10);
-
-      return data ?? [];
-    },
-  });
-}
